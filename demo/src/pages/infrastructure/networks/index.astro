@@ -1,0 +1,44 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const networks = data.data.networks || [];
+---
+
+<AutarkLayout
+  title="Networks (VPC)"
+  description="Virtual networks, subnets, and routing."
+  currentPath="/infrastructure/networks"
+>
+  <div class="mb-6 flex justify-end">
+    <a href="/infrastructure/networks/create" class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Network
+    </a>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CIDR</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subnets</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NAT</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {networks.map(net => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <a href={`/infrastructure/networks/detail?id=${net.id}`} class="text-sm font-medium text-primary hover:underline">{net.name}</a>
+              <div class="text-xs text-gray-500">{net.id}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">{net.cidr}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{net.subnets?.length || 0}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{net.natGateway ? '✓' : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

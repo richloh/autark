@@ -1,0 +1,374 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const providers = data.data.providers || [];
+  return providers.map(provider => ({
+    params: { id: provider.id },
+    props: { provider }
+  }));
+}
+
+const { provider } = Astro.props;
+
+// Find VMs using this provider
+const providerVMs = data.data.vms.filter(vm =>
+  vm.provider.type === 'cloud' && vm.provider.providerId === provider.provider.toLowerCase().replace(/\s+/g, '')
+);
+
+// Mock discovered resources
+const discoveredResources = {
+  servers: providerVMs.length + 3,
+  networks: 2,
+  volumes: providerVMs.length * 2,
+  ips: providerVMs.length + 1
+};
+
+// Mock connection test results
+const connectionTestSteps = [
+  { step: 'Validating credentials', status: 'success', duration: '0.8s' },
+  { step: 'Testing API connectivity', status: 'success', duration: '1.2s' },
+  { step: 'Verifying permissions', status: 'success', duration: '0.5s' },
+  { step: 'Fetching quotas', status: 'success', duration: '1.0s' },
+  { step: 'Discovering regions', status: 'success', duration: '1.5s' }
+];
+---
+
+<AutarkLayout
+  title={provider.provider}
+  description={`Cloud Provider ${provider.id}`}
+  currentPath={`/hardware/cloud-providers/${provider.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/hardware/cloud-providers" class="text-sm text-primary hover:underline">
+      ← Back to Cloud Providers
+    </a>
+    <div class="flex gap-2">
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Test Connection
+      </button>
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Sync Resources
+      </button>
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Edit
+      </button>
+      <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Provider Info</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Status</span>
+          <StatusBadge status={provider.status} />
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Provider</span>
+          <span class="text-sm font-medium">{provider.provider}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Regions</span>
+          <span class="text-sm font-medium">{provider.regions.length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Managed VMs</span>
+          <span class="text-sm font-medium">{providerVMs.length}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Credentials</h3>
+      <div class="space-y-3">
+        {Object.entries(provider.credentials).map(([key, value]) => (
+          <div>
+            <span class="text-sm text-gray-600">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
+            <p class="text-sm font-mono font-medium text-gray-900 mt-1 break-all">{value}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Discovered Resources</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Servers</span>
+          <span class="text-sm font-medium">{discoveredResources.servers}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Networks</span>
+          <span class="text-sm font-medium">{discoveredResources.networks}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Volumes</span>
+          <span class="text-sm font-medium">{discoveredResources.volumes}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">IPs</span>
+          <span class="text-sm font-medium">{discoveredResources.ips}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="overview">
+          Overview
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="quotas">
+          Quotas
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="resources">
+          Discovered Resources
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Overview Tab -->
+      <div id="overview-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">Provider Configuration</h3>
+
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Available Regions</h4>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {provider.regions.map(region => (
+                <div class="border border-gray-200 rounded p-3 text-center">
+                  <span class="text-sm font-medium">{region}</span>
+                  <p class="text-xs text-gray-500 mt-1">Active</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Connection Test Results</h4>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="space-y-3">
+                {connectionTestSteps.map(test => (
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                      <span class={`w-2 h-2 rounded-full ${test.status === 'success' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                      <span class="text-sm">{test.step}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <span class="text-xs text-gray-500">{test.duration}</span>
+                      <span class={`px-2 py-1 rounded text-xs font-medium ${test.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {test.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm text-green-600 font-medium">Connection healthy</p>
+                <p class="text-xs text-gray-500 mt-1">Last tested: 2025-10-25 08:00:00</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Tags</h4>
+            <div class="flex flex-wrap gap-2">
+              {provider.tags && provider.tags.length > 0 ? (
+                provider.tags.map(tag => <TagBadge tag={tag} />)
+              ) : (
+                <p class="text-sm text-gray-500">No tags</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quotas Tab -->
+      <div id="quotas-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Quotas & Limits</h3>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Request Increase
+          </button>
+        </div>
+
+        <div class="space-y-4">
+          {Object.entries(provider.quotas).map(([resource, limit]) => {
+            // Calculate mock usage
+            const usage = resource === 'vms' ? providerVMs.length :
+                         resource === 'servers' ? providerVMs.length :
+                         Math.floor(limit * 0.3);
+            const percentage = (usage / limit) * 100;
+
+            return (
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h4 class="text-sm font-medium capitalize">{resource}</h4>
+                    <p class="text-xs text-gray-500 mt-1">
+                      {usage} of {limit} used
+                    </p>
+                  </div>
+                  <span class={`px-2 py-1 rounded text-xs font-medium ${
+                    percentage > 80 ? 'bg-red-100 text-red-700' :
+                    percentage > 60 ? 'bg-amber-100 text-amber-700' :
+                    'bg-green-100 text-green-700'
+                  }`}>
+                    {Math.round(percentage)}%
+                  </span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                  <div class={`rounded-full h-2 ${
+                    percentage > 80 ? 'bg-red-500' :
+                    percentage > 60 ? 'bg-amber-500' :
+                    'bg-green-500'
+                  }`} style={`width: ${percentage}%`}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded">
+          <p class="text-sm text-blue-800">
+            <strong>Note:</strong> Quotas are managed by the cloud provider. Contact their support to request increases.
+          </p>
+        </div>
+      </div>
+
+      <!-- Discovered Resources Tab -->
+      <div id="resources-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Discovered Resources</h3>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Sync Now
+          </button>
+        </div>
+
+        <div class="mb-6">
+          <h4 class="text-sm font-medium text-gray-700 mb-3">Virtual Machines ({providerVMs.length})</h4>
+          {providerVMs.length > 0 ? (
+            <div class="space-y-2">
+              {providerVMs.map(vm => {
+                const preset = vm.presetId ? data.presets.vm.find(p => p.id === vm.presetId) : null;
+                return (
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex justify-between items-start">
+                      <div>
+                        <a href={`/infrastructure/vms/${vm.id}`} class="text-sm font-medium text-primary hover:underline">
+                          {vm.name}
+                        </a>
+                        <p class="text-sm text-gray-500 mt-1">
+                          Region: {vm.provider.region} •
+                          {preset ? preset.name : `Custom: ${vm.custom?.vcpus} vCPUs, ${vm.custom?.ramGB} GB RAM`}
+                        </p>
+                      </div>
+                      <StatusBadge status={vm.status} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p class="text-gray-500 text-center py-8">No VMs discovered on this provider</p>
+          )}
+        </div>
+
+        <div>
+          <h4 class="text-sm font-medium text-gray-700 mb-3">Other Resources</h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border border-gray-200 rounded-lg p-4">
+              <p class="text-sm text-gray-500">Networks</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{discoveredResources.networks}</p>
+            </div>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <p class="text-sm text-gray-500">Volumes</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{discoveredResources.volumes}</p>
+            </div>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <p class="text-sm text-gray-500">IP Addresses</p>
+              <p class="text-2xl font-bold text-gray-900 mt-1">{discoveredResources.ips}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-xs text-gray-500">
+          Last synced: 2025-10-25 08:00:00
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Provider connected</p>
+            <p class="text-gray-500">admin@example.com - 2025-09-01 10:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Credentials validated</p>
+            <p class="text-gray-500">System - 2025-09-01 10:01:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Initial resource sync completed</p>
+            <p class="text-gray-500">System - 2025-09-01 10:05:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">VM deployed: {providerVMs[0]?.name || 'ml-gpu-1'}</p>
+            <p class="text-gray-500">admin@example.com - 2025-09-15 14:20:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Resources synced</p>
+            <p class="text-gray-500">System - 2025-10-25 08:00:00</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

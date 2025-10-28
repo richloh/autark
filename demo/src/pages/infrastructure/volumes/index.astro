@@ -1,0 +1,77 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+import data from '../../../data/data.json';
+import { calculateVolumeCost } from '../../../lib/pricing.js';
+
+const volumes = data.data.volumes || [];
+---
+
+<AutarkLayout
+  title="Block Volumes"
+  description="Network-attached block storage volumes."
+  currentPath="/infrastructure/volumes"
+>
+  <div class="mb-6 flex items-center justify-between">
+    <input
+      type="search"
+      placeholder="Search volumes..."
+      class="border border-gray-300 rounded px-4 py-2 text-sm w-64"
+    />
+    <div class="flex gap-2">
+      <a href="/infrastructure/volumes/presets" class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Presets
+      </a>
+      <a href="/infrastructure/volumes/create" class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Create Volume
+      </a>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IOPS</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attached To</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {volumes.map(vol => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <a href={`/infrastructure/volumes/detail?id=${vol.id}`} class="text-sm font-medium text-primary hover:underline">{vol.name}</a>
+              <div class="text-xs text-gray-500">{vol.id}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{vol.type.toUpperCase()}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{vol.sizeGB} GB</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{vol.iops}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {vol.attachedTo ? (
+                <a href={`/infrastructure/vms/detail?id=${vol.attachedTo.id}`} class="text-primary hover:underline">
+                  {vol.attachedTo.id}
+                </a>
+              ) : (
+                <span class="text-gray-400">Unattached</span>
+              )}
+            </td>
+            <td class="px-6 py-4">
+              <div class="flex gap-1">
+                {vol.tags?.slice(0, 2).map(tag => <TagBadge tag={tag} />)}
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              €{calculateVolumeCost(vol, data.pricing)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

@@ -1,0 +1,1565 @@
+{
+  "app": {
+    "name": "Autark",
+    "tagline": "Open-source AWS for self-hosted environments",
+    "version": "0.1.0",
+    "currency": "EUR",
+    "theme": {
+      "primary": "#0ea5e9",
+      "accent": "#22c55e",
+      "warning": "#f59e0b",
+      "danger": "#ef4444",
+      "muted": "#6b7280"
+    }
+  },
+  "accounts": [
+    { "id": "acc-myco-a", "name": "MyCompany - Country Branch A" },
+    { "id": "acc-myco-b", "name": "MyCompany - Division B" }
+  ],
+  "projects": [
+    { "id": "proj-app1", "accountId": "acc-myco-a", "name": "Business App 1" },
+    { "id": "proj-app2", "accountId": "acc-myco-a", "name": "Customer App 2" },
+    { "id": "proj-ml", "accountId": "acc-myco-b", "name": "ML Platform" },
+    { "id": "proj-infra", "accountId": "acc-myco-b", "name": "Shared Infra" }
+  ],
+  "pricing": {
+    "vm": {
+      "vCPUPerMonth": 7,
+      "ramGBPerMonth": 1.5,
+      "systemDiskGBPerMonth": 0.05,
+      "publicIPv4PerMonth": 2,
+      "publicIPv6PerMonth": 0,
+      "gpuPerHour": {
+        "A6000": 0.8,
+        "H100": 2.5,
+        "H200": 3.2
+      }
+    },
+    "volume": {
+      "ssdGBPerMonth": 0.08,
+      "nvmeGBPerMonth": 0.12,
+      "hddGBPerMonth": 0.04,
+      "iopsPer1000PerMonth": 1.2,
+      "throughputMBpsPerMonth": 0.5,
+      "snapshotGBPerMonth": 0.02
+    },
+    "db": {
+      "vCPUPerMonth": 9,
+      "ramGBPerMonth": 2,
+      "storageGBPerMonth": 0.1,
+      "haMultiplier": 1.7,
+      "backupGBPerMonth": 0.03
+    },
+    "k8s": {
+      "controlPlaneSmallPerMonth": 20,
+      "controlPlaneHAAddOnPerMonth": 35,
+      "nodePricingUsesVmPricing": true
+    },
+    "objectStorage": {
+      "standardGBPerMonth": 0.022,
+      "infrequentAccessGBPerMonth": 0.012,
+      "requestsPerMillion": 0.4,
+      "egressPerGB": 0.02
+    },
+    "loadBalancer": {
+      "l4PerHour": 0.012,
+      "l7PerHour": 0.025,
+      "dataProcessedPerGB": 0.01
+    },
+    "ip": {
+      "elasticIPv4PerMonth": 2,
+      "elasticIPv6PerMonth": 0
+    },
+    "dns": {
+      "zonePerMonth": 0.5,
+      "recordPerMonth": 0.01
+    },
+    "backups": {
+      "perGBPerMonth": 0.03
+    },
+    "support": {
+      "basicPerAccountPerMonth": 0,
+      "premiumPerAccountPerMonth": 300
+    }
+  },
+  "presets": {
+    "vm": [
+      { "id": "vm-m2", "name": "M2", "vcpus": 2, "ramGB": 4, "systemDiskGB": 80, "monthlyPrice": 20 },
+      { "id": "vm-m4", "name": "M4", "vcpus": 4, "ramGB": 8, "systemDiskGB": 100, "monthlyPrice": 34 },
+      { "id": "vm-c8", "name": "C8", "vcpus": 8, "ramGB": 16, "systemDiskGB": 120, "monthlyPrice": 68 },
+      { "id": "vm-g8a", "name": "G8-AI", "vcpus": 8, "ramGB": 32, "systemDiskGB": 200, "gpu": { "model": "A6000", "count": 1 }, "monthlyPrice": 150 }
+    ],
+    "volume": [
+      { "id": "vol-s-100", "name": "SSD-100", "type": "ssd", "sizeGB": 100, "iops": 3000, "throughputMBps": 125, "monthlyPrice": 8 },
+      { "id": "vol-n-500", "name": "NVMe-500", "type": "nvme", "sizeGB": 500, "iops": 10000, "throughputMBps": 500, "monthlyPrice": 60 }
+    ],
+    "db": [
+      { "id": "db-pg-s", "engine": "postgres", "name": "PG-S", "vcpus": 2, "ramGB": 4, "storageGB": 50, "monthlyPrice": 35 },
+      { "id": "db-my-m", "engine": "mysql", "name": "MySQL-M", "vcpus": 4, "ramGB": 8, "storageGB": 100, "monthlyPrice": 70 },
+      { "id": "db-rd-s", "engine": "redis", "name": "Redis-S", "ramGB": 4, "monthlyPrice": 25 }
+    ],
+    "k8sNode": [
+      { "id": "k8s-np-s", "name": "Node-S", "vcpus": 2, "ramGB": 4, "systemDiskGB": 60, "monthlyPrice": 22 },
+      { "id": "k8s-np-m", "name": "Node-M", "vcpus": 4, "ramGB": 8, "systemDiskGB": 80, "monthlyPrice": 36 }
+    ]
+  },
+  "hardwareProviders": {
+    "selfHosted": [
+      { "id": "dc1", "name": "On-Prem DC1", "location": "Frankfurt, DE" },
+      { "id": "dc2", "name": "On-Prem DC2", "location": "Amsterdam, NL" }
+    ],
+    "cloud": [
+      { "id": "hetzner", "name": "Hetzner", "regions": ["nbg1", "hel1", "ash"] },
+      { "id": "awsbm", "name": "AWS Bare Metal", "regions": ["eu-central-1", "eu-west-1", "us-east-1"] }
+    ]
+  },
+  "ipPools": [
+    { "id": "pool-dc1", "name": "DC1 Public IPv4", "type": "ipv4", "cidr": "203.0.113.0/24", "available": 190, "allocated": 66 },
+    { "id": "pool-dc1-v6", "name": "DC1 IPv6", "type": "ipv6", "cidr": "2001:db8:abcd::/48", "available": 65490, "allocated": 510 },
+    { "id": "pool-dc2", "name": "DC2 Public IPv4", "type": "ipv4", "cidr": "198.51.100.0/24", "available": 196, "allocated": 60 }
+  ],
+  "sshKeys": [
+    { "id": "ssh-001", "name": "alice@laptop", "fingerprint": "SHA256:abc123", "publicKey": "ssh-ed25519 AAAAC3Nza... alice@laptop" },
+    { "id": "ssh-002", "name": "ops@desktop", "fingerprint": "SHA256:def456", "publicKey": "ssh-rsa AAAAB3Nza... ops@desktop" },
+    { "id": "ssh-003", "name": "ci@runner", "fingerprint": "SHA256:ghi789", "publicKey": "ssh-ed25519 AAAAC3Nza... ci@runner" }
+  ],
+  "initScripts": [
+    { "id": "init-001", "name": "Web init", "description": "Install Nginx, configure app user", "script": "#!/bin/bash\napt update && apt install -y nginx\nuseradd -m app\n" },
+    { "id": "init-002", "name": "DB init", "description": "Create app DB and user", "script": "-- SQL or bash to init DB\n" },
+    { "id": "init-003", "name": "ML Worker", "description": "Install CUDA and drivers", "script": "#!/bin/bash\napt-get update\napt-get install -y cuda-toolkit\n" }
+  ],
+  "data": {
+    "vms": [
+      {
+        "id": "vm-001",
+        "name": "web-1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "presetId": "vm-m4",
+        "provider": { "type": "selfHosted", "locationId": "dc1", "hostId": "bm-001" },
+        "gpus": [],
+        "image": { "os": "ubuntu", "version": "24.04" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "app", "value": "web" }],
+        "network": { "networkId": "net-001", "subnetId": "sn-001" },
+        "ips": ["ip-001"],
+        "sshKeyId": "ssh-001",
+        "attachedVolumes": ["vol-001"],
+        "firewallIds": ["fw-002"],
+        "backups": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "initScriptId": "init-001",
+        "status": "running",
+        "monthlyCostHint": 42
+      },
+      {
+        "id": "vm-002",
+        "name": "ml-gpu-1",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-ml",
+        "presetId": null,
+        "custom": { "vcpus": 16, "ramGB": 64, "systemDiskGB": 200 },
+        "provider": { "type": "cloud", "providerId": "hetzner", "region": "hel1" },
+        "gpus": [{ "model": "A6000", "count": 1 }],
+        "image": { "os": "ubuntu", "version": "22.04" },
+        "tags": [{ "key": "env", "value": "dev" }, { "key": "team", "value": "ml" }],
+        "network": { "networkId": "net-002", "subnetId": "sn-003" },
+        "ips": ["ip-003"],
+        "sshKeyId": "ssh-002",
+        "attachedVolumes": ["vol-002"],
+        "firewallIds": ["fw-001"],
+        "backups": { "enabled": true, "schedule": "weekly", "retention": 4 },
+        "initScriptId": "init-003",
+        "status": "stopped",
+        "monthlyCostHint": 230
+      },
+      {
+        "id": "vm-003",
+        "name": "web-2",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "presetId": "vm-m4",
+        "provider": { "type": "selfHosted", "locationId": "dc1", "hostId": "bm-002" },
+        "gpus": [],
+        "image": { "os": "ubuntu", "version": "24.04" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "app", "value": "web" }],
+        "network": { "networkId": "net-001", "subnetId": "sn-001" },
+        "ips": ["ip-004"],
+        "sshKeyId": "ssh-001",
+        "attachedVolumes": ["vol-003"],
+        "firewallIds": ["fw-002"],
+        "backups": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "initScriptId": "init-001",
+        "status": "running",
+        "monthlyCostHint": 41
+      },
+      {
+        "id": "vm-004",
+        "name": "api-1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app2",
+        "presetId": "vm-c8",
+        "provider": { "type": "selfHosted", "locationId": "dc2", "hostId": "bm-004" },
+        "gpus": [],
+        "image": { "os": "debian", "version": "12" },
+        "tags": [{ "key": "env", "value": "staging" }, { "key": "app", "value": "api" }],
+        "network": { "networkId": "net-003", "subnetId": "sn-004" },
+        "ips": ["ip-008"],
+        "sshKeyId": "ssh-003",
+        "attachedVolumes": ["vol-004"],
+        "firewallIds": ["fw-003"],
+        "backups": { "enabled": false },
+        "initScriptId": "init-001",
+        "status": "running",
+        "monthlyCostHint": 75
+      },
+      {
+        "id": "vm-005",
+        "name": "db-replica-1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "presetId": "vm-m2",
+        "provider": { "type": "selfHosted", "locationId": "dc1", "hostId": "bm-003" },
+        "gpus": [],
+        "image": { "os": "ubuntu", "version": "24.04" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "tier", "value": "db" }],
+        "network": { "networkId": "net-001", "subnetId": "sn-002" },
+        "ips": [],
+        "sshKeyId": "ssh-002",
+        "attachedVolumes": ["vol-005"],
+        "firewallIds": ["fw-004"],
+        "backups": { "enabled": true, "schedule": "weekly", "retention": 4 },
+        "initScriptId": "init-002",
+        "status": "running",
+        "monthlyCostHint": 28
+      },
+      {
+        "id": "vm-006",
+        "name": "ml-gpu-2",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-ml",
+        "presetId": null,
+        "custom": { "vcpus": 32, "ramGB": 128, "systemDiskGB": 300 },
+        "provider": { "type": "cloud", "providerId": "hetzner", "region": "nbg1" },
+        "gpus": [{ "model": "A6000", "count": 2 }],
+        "image": { "os": "ubuntu", "version": "22.04" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "team", "value": "ml" }],
+        "network": { "networkId": "net-002", "subnetId": "sn-003" },
+        "ips": ["ip-009"],
+        "sshKeyId": "ssh-002",
+        "attachedVolumes": ["vol-006", "vol-007"],
+        "firewallIds": ["fw-001"],
+        "backups": { "enabled": false },
+        "initScriptId": "init-003",
+        "status": "running",
+        "monthlyCostHint": 520
+      },
+      {
+        "id": "vm-007",
+        "name": "k8s-node-1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "presetId": "vm-m4",
+        "provider": { "type": "selfHosted", "locationId": "dc1", "hostId": "bm-005" },
+        "gpus": [],
+        "image": { "os": "ubuntu", "version": "24.04" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "role", "value": "k8s-node" }],
+        "network": { "networkId": "net-001", "subnetId": "sn-002" },
+        "ips": [],
+        "sshKeyId": "ssh-003",
+        "attachedVolumes": [],
+        "firewallIds": ["fw-005"],
+        "backups": { "enabled": false },
+        "initScriptId": null,
+        "status": "running",
+        "monthlyCostHint": 34
+      },
+      {
+        "id": "vm-008",
+        "name": "lb-edge-1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "presetId": "vm-m2",
+        "provider": { "type": "selfHosted", "locationId": "dc1", "hostId": "bm-006" },
+        "gpus": [],
+        "image": { "os": "debian", "version": "12" },
+        "tags": [{ "key": "env", "value": "prod" }, { "key": "role", "value": "edge" }],
+        "network": { "networkId": "net-004", "subnetId": "sn-006" },
+        "ips": ["ip-010"],
+        "sshKeyId": "ssh-001",
+        "attachedVolumes": [],
+        "firewallIds": ["fw-006"],
+        "backups": { "enabled": false },
+        "initScriptId": null,
+        "status": "running",
+        "monthlyCostHint": 26
+      }
+    ],
+    "volumes": [
+      {
+        "id": "vol-001",
+        "name": "web-1-data",
+        "type": "ssd",
+        "sizeGB": 200,
+        "iops": 3000,
+        "throughputMBps": 125,
+        "attachedTo": { "type": "vm", "id": "vm-001" },
+        "tags": [{ "key": "env", "value": "prod" }],
+        "snapshots": [{ "id": "snap-001", "createdAt": "2025-10-20T08:00:00Z", "sizeGB": 5 }],
+        "backupPolicy": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "monthlyCostHint": 20
+      },
+      {
+        "id": "vol-002",
+        "name": "ml-datasets",
+        "type": "hdd",
+        "sizeGB": 2000,
+        "iops": 500,
+        "throughputMBps": 50,
+        "attachedTo": { "type": "vm", "id": "vm-002" },
+        "tags": [{ "key": "team", "value": "ml" }],
+        "snapshots": [],
+        "backupPolicy": { "enabled": false },
+        "monthlyCostHint": 120
+      },
+      {
+        "id": "vol-003",
+        "name": "web-2-data",
+        "type": "ssd",
+        "sizeGB": 150,
+        "iops": 3000,
+        "throughputMBps": 125,
+        "attachedTo": { "type": "vm", "id": "vm-003" },
+        "tags": [{ "key": "env", "value": "prod" }],
+        "snapshots": [{ "id": "snap-002", "createdAt": "2025-10-21T08:00:00Z", "sizeGB": 4 }],
+        "backupPolicy": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "monthlyCostHint": 16
+      },
+      {
+        "id": "vol-004",
+        "name": "api-1-logs",
+        "type": "nvme",
+        "sizeGB": 250,
+        "iops": 8000,
+        "throughputMBps": 400,
+        "attachedTo": { "type": "vm", "id": "vm-004" },
+        "tags": [{ "key": "env", "value": "staging" }],
+        "snapshots": [],
+        "backupPolicy": { "enabled": false },
+        "monthlyCostHint": 38
+      },
+      {
+        "id": "vol-005",
+        "name": "db-replica-1-data",
+        "type": "ssd",
+        "sizeGB": 300,
+        "iops": 6000,
+        "throughputMBps": 200,
+        "attachedTo": { "type": "vm", "id": "vm-005" },
+        "tags": [{ "key": "tier", "value": "db" }],
+        "snapshots": [{ "id": "snap-003", "createdAt": "2025-10-22T08:00:00Z", "sizeGB": 10 }],
+        "backupPolicy": { "enabled": true, "schedule": "weekly", "retention": 4 },
+        "monthlyCostHint": 30
+      },
+      {
+        "id": "vol-006",
+        "name": "ml-gpu-2-checkpoints",
+        "type": "nvme",
+        "sizeGB": 1000,
+        "iops": 12000,
+        "throughputMBps": 700,
+        "attachedTo": { "type": "vm", "id": "vm-006" },
+        "tags": [{ "key": "team", "value": "ml" }],
+        "snapshots": [],
+        "backupPolicy": { "enabled": false },
+        "monthlyCostHint": 130
+      },
+      {
+        "id": "vol-007",
+        "name": "ml-gpu-2-datasets",
+        "type": "hdd",
+        "sizeGB": 4000,
+        "iops": 600,
+        "throughputMBps": 60,
+        "attachedTo": { "type": "vm", "id": "vm-006" },
+        "tags": [{ "key": "team", "value": "ml" }],
+        "snapshots": [],
+        "backupPolicy": { "enabled": false },
+        "monthlyCostHint": 160
+      },
+      {
+        "id": "vol-008",
+        "name": "edge-cache",
+        "type": "nvme",
+        "sizeGB": 200,
+        "iops": 10000,
+        "throughputMBps": 500,
+        "attachedTo": { "type": "vm", "id": "vm-008" },
+        "tags": [{ "key": "role", "value": "edge" }],
+        "snapshots": [],
+        "backupPolicy": { "enabled": false },
+        "monthlyCostHint": 30
+      }
+    ],
+    "networks": [
+      {
+        "id": "net-001",
+        "name": "vpc-app1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "cidr": "10.10.0.0/16",
+        "natGateway": true,
+        "subnets": [
+          { "id": "sn-001", "name": "app1-public", "cidr": "10.10.1.0/24", "public": true },
+          { "id": "sn-002", "name": "app1-private", "cidr": "10.10.2.0/24", "public": false }
+        ],
+        "tags": [{ "key": "env", "value": "prod" }]
+      },
+      {
+        "id": "net-002",
+        "name": "vpc-ml",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-ml",
+        "cidr": "10.20.0.0/16",
+        "natGateway": false,
+        "subnets": [
+          { "id": "sn-003", "name": "ml-compute", "cidr": "10.20.1.0/24", "public": false }
+        ],
+        "tags": [{ "key": "team", "value": "ml" }]
+      },
+      {
+        "id": "net-003",
+        "name": "vpc-app2",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app2",
+        "cidr": "10.30.0.0/16",
+        "natGateway": true,
+        "subnets": [
+          { "id": "sn-004", "name": "app2-public", "cidr": "10.30.1.0/24", "public": true },
+          { "id": "sn-005", "name": "app2-private", "cidr": "10.30.2.0/24", "public": false }
+        ],
+        "tags": [{ "key": "env", "value": "staging" }]
+      },
+      {
+        "id": "net-004",
+        "name": "vpc-edge",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "cidr": "10.40.0.0/16",
+        "natGateway": false,
+        "subnets": [
+          { "id": "sn-006", "name": "edge-public", "cidr": "10.40.1.0/24", "public": true }
+        ],
+        "tags": [{ "key": "role", "value": "edge" }]
+      }
+    ],
+    "ips": [
+      { "id": "ip-001", "address": "203.0.113.10", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "vm", "id": "vm-001" }, "tags": [{ "key": "env", "value": "prod" }] },
+      { "id": "ip-002", "address": "203.0.113.11", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "lb", "id": "lb-001" }, "tags": [{ "key": "role", "value": "lb" }] },
+      { "id": "ip-003", "address": "203.0.113.21", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "vm", "id": "vm-002" }, "tags": [{ "key": "team", "value": "ml" }] },
+      { "id": "ip-004", "address": "203.0.113.12", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "vm", "id": "vm-003" }, "tags": [{ "key": "env", "value": "prod" }] },
+      { "id": "ip-005", "address": "203.0.113.13", "version": 4, "poolId": "pool-dc1", "assignedTo": null, "tags": [] },
+      { "id": "ip-006", "address": "198.51.100.10", "version": 4, "poolId": "pool-dc2", "assignedTo": null, "tags": [] },
+      { "id": "ip-007", "address": "198.51.100.11", "version": 4, "poolId": "pool-dc2", "assignedTo": { "type": "lb", "id": "lb-002" }, "tags": [{ "key": "env", "value": "staging" }] },
+      { "id": "ip-008", "address": "198.51.100.12", "version": 4, "poolId": "pool-dc2", "assignedTo": { "type": "vm", "id": "vm-004" }, "tags": [{ "key": "env", "value": "staging" }] },
+      { "id": "ip-009", "address": "203.0.113.31", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "vm", "id": "vm-006" }, "tags": [{ "key": "team", "value": "ml" }] },
+      { "id": "ip-010", "address": "203.0.113.14", "version": 4, "poolId": "pool-dc1", "assignedTo": { "type": "vm", "id": "vm-008" }, "tags": [{ "key": "role", "value": "edge" }] }
+    ],
+    "firewalls": [
+      {
+        "id": "fw-001",
+        "name": "default-deny",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "22", "source": "198.51.100.0/24", "action": "allow", "priority": 1000 },
+          { "id": "r2", "direction": "inbound", "protocol": "icmp", "ports": "*", "source": "0.0.0.0/0", "action": "allow", "priority": 1100 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-002" }, { "type": "vm", "id": "vm-006" }],
+        "tags": []
+      },
+      {
+        "id": "fw-002",
+        "name": "web-allow",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "80,443", "source": "0.0.0.0/0", "action": "allow", "priority": 900 },
+          { "id": "r2", "direction": "inbound", "protocol": "tcp", "ports": "22", "source": "198.51.100.0/24", "action": "allow", "priority": 1000 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-001" }, { "type": "vm", "id": "vm-003" }],
+        "tags": [{ "key": "env", "value": "prod" }]
+      },
+      {
+        "id": "fw-003",
+        "name": "api-staging",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "80,443", "source": "0.0.0.0/0", "action": "allow", "priority": 900 },
+          { "id": "r2", "direction": "inbound", "protocol": "tcp", "ports": "22", "source": "203.0.113.0/24", "action": "allow", "priority": 950 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-004" }],
+        "tags": [{ "key": "env", "value": "staging" }]
+      },
+      {
+        "id": "fw-004",
+        "name": "db-internal",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "5432", "source": "10.10.0.0/16", "action": "allow", "priority": 800 },
+          { "id": "r2", "direction": "inbound", "protocol": "tcp", "ports": "22", "source": "10.0.0.0/8", "action": "allow", "priority": 900 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-005" }, { "type": "db", "id": "db-001" }],
+        "tags": [{ "key": "tier", "value": "db" }]
+      },
+      {
+        "id": "fw-005",
+        "name": "k8s-nodes",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "10250", "source": "10.10.0.0/16", "action": "allow", "priority": 900 },
+          { "id": "r2", "direction": "inbound", "protocol": "tcp", "ports": "30000-32767", "source": "10.10.0.0/16", "action": "allow", "priority": 1000 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-007" }],
+        "tags": [{ "key": "role", "value": "k8s" }]
+      },
+      {
+        "id": "fw-006",
+        "name": "edge-lb",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "80,443", "source": "0.0.0.0/0", "action": "allow", "priority": 850 },
+          { "id": "r2", "direction": "outbound", "protocol": "tcp", "ports": "80,443", "destination": "0.0.0.0/0", "action": "allow", "priority": 900 }
+        ],
+        "attachedTo": [{ "type": "vm", "id": "vm-008" }, { "type": "lb", "id": "lb-001" }],
+        "tags": [{ "key": "role", "value": "edge" }]
+      },
+      {
+        "id": "fw-007",
+        "name": "redis-internal",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "6379", "source": "10.20.0.0/16", "action": "allow", "priority": 800 }
+        ],
+        "attachedTo": [{ "type": "db", "id": "db-002" }],
+        "tags": [{ "key": "team", "value": "ml" }]
+      },
+      {
+        "id": "fw-008",
+        "name": "lb-staging",
+        "defaultPolicy": "deny",
+        "rules": [
+          { "id": "r1", "direction": "inbound", "protocol": "tcp", "ports": "80,443", "source": "0.0.0.0/0", "action": "allow", "priority": 850 }
+        ],
+        "attachedTo": [{ "type": "lb", "id": "lb-002" }],
+        "tags": [{ "key": "env", "value": "staging" }]
+      }
+    ],
+    "dnsZones": [
+      {
+        "id": "zone-001",
+        "name": "example.com",
+        "provider": "internal",
+        "records": [
+          { "id": "rec-001", "type": "A", "name": "web", "value": "203.0.113.10", "ttl": 300 },
+          { "id": "rec-002", "type": "CNAME", "name": "www", "value": "web.example.com", "ttl": 300 },
+          { "id": "rec-003", "type": "MX", "name": "@", "value": "10 mail.example.com.", "ttl": 3600 },
+          { "id": "rec-004", "type": "TXT", "name": "@", "value": "v=spf1 include:_spf.example.com ~all", "ttl": 3600 }
+        ],
+        "tags": [{ "key": "env", "value": "prod" }]
+      },
+      {
+        "id": "zone-002",
+        "name": "app.internal",
+        "provider": "internal",
+        "records": [
+          { "id": "rec-101", "type": "A", "name": "api", "value": "198.51.100.12", "ttl": 60 },
+          { "id": "rec-102", "type": "A", "name": "db", "value": "10.10.2.10", "ttl": 60 },
+          { "id": "rec-103", "type": "TXT", "name": "_k8s", "value": "owner=cluster-app1", "ttl": 300 }
+        ],
+        "tags": [{ "key": "env", "value": "staging" }]
+      }
+    ],
+    "dbInstances": [
+      {
+        "id": "db-001",
+        "name": "pg-app1",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "engine": "postgres",
+        "version": "14",
+        "presetId": "db-pg-s",
+        "vcpus": 2,
+        "ramGB": 4,
+        "storageGB": 50,
+        "ha": false,
+        "networkId": "net-001",
+        "subnetId": "sn-002",
+        "firewallIds": ["fw-004"],
+        "endpoint": "pg-app1.db.autark.local:5432",
+        "users": [{ "username": "app", "role": "rw" }],
+        "backups": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "tags": [{ "key": "env", "value": "prod" }],
+        "status": "available",
+        "monthlyCostHint": 45
+      },
+      {
+        "id": "db-002",
+        "name": "redis-ml",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-ml",
+        "engine": "redis",
+        "version": "7",
+        "vcpus": 0,
+        "ramGB": 8,
+        "storageGB": 0,
+        "ha": true,
+        "networkId": "net-002",
+        "subnetId": "sn-003",
+        "firewallIds": ["fw-007"],
+        "endpoint": "redis-ml.cache.autark.local:6379",
+        "users": [],
+        "backups": { "enabled": false },
+        "tags": [{ "key": "team", "value": "ml" }],
+        "status": "available",
+        "monthlyCostHint": 35
+      },
+      {
+        "id": "db-003",
+        "name": "mysql-app2",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app2",
+        "engine": "mysql",
+        "version": "8",
+        "vcpus": 4,
+        "ramGB": 8,
+        "storageGB": 100,
+        "ha": true,
+        "networkId": "net-003",
+        "subnetId": "sn-005",
+        "firewallIds": ["fw-004"],
+        "endpoint": "mysql-app2.db.autark.local:3306",
+        "users": [{ "username": "app2", "role": "rw" }],
+        "backups": { "enabled": true, "schedule": "daily", "retention": 7 },
+        "tags": [{ "key": "env", "value": "staging" }],
+        "status": "available",
+        "monthlyCostHint": 95
+      }
+    ],
+    "kubernetes": [
+      {
+        "id": "k8s-001",
+        "name": "app1-cluster",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "version": "1.29",
+        "controlPlane": { "ha": false, "size": "small" },
+        "nodePools": [
+          { "id": "np-1", "name": "web-pool", "count": 3, "presetId": "k8s-np-m", "tags": [{ "key": "role", "value": "web" }] }
+        ],
+        "networkId": "net-001",
+        "cni": "calico",
+        "storageClass": "standard-ssd",
+        "addons": { "ingress": true, "metricsServer": true },
+        "kubeconfig": "apiVersion: v1\nclusters: ...\n",
+        "tags": [{ "key": "env", "value": "prod" }],
+        "status": "healthy",
+        "monthlyCostHint": 140
+      },
+      {
+        "id": "k8s-002",
+        "name": "ml-infra",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-infra",
+        "version": "1.30",
+        "controlPlane": { "ha": true, "size": "small" },
+        "nodePools": [
+          { "id": "np-2", "name": "gpu-pool", "count": 2, "presetId": "k8s-np-m", "tags": [{ "key": "team", "value": "ml" }] }
+        ],
+        "networkId": "net-002",
+        "cni": "cilium",
+        "storageClass": "standard-ssd",
+        "addons": { "ingress": true, "metricsServer": true },
+        "kubeconfig": "apiVersion: v1\nclusters: ...\n",
+        "tags": [{ "key": "team", "value": "ml" }],
+        "status": "healthy",
+        "monthlyCostHint": 210
+      }
+    ],
+    "buckets": [
+      {
+        "id": "bkt-001",
+        "name": "app1-assets",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "region": "dc1",
+        "storageClass": "STANDARD",
+        "versioning": true,
+        "encryption": "SSE-S3",
+        "bytesUsed": 1200000000,
+        "requestsLast30d": 1800000,
+        "egressGBLast30d": 12,
+        "publicAccess": false,
+        "tags": [{ "key": "env", "value": "prod" }],
+        "monthlyCostHint": 1.2
+      },
+      {
+        "id": "bkt-002",
+        "name": "ml-artifacts",
+        "accountId": "acc-myco-b",
+        "projectId": "proj-ml",
+        "region": "dc2",
+        "storageClass": "INFREQUENT_ACCESS",
+        "versioning": false,
+        "encryption": "SSE-S3",
+        "bytesUsed": 78000000000,
+        "requestsLast30d": 250000,
+        "egressGBLast30d": 80,
+        "publicAccess": false,
+        "tags": [{ "key": "team", "value": "ml" }],
+        "monthlyCostHint": 12.3
+      },
+      {
+        "id": "bkt-003",
+        "name": "app2-logs",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app2",
+        "region": "dc2",
+        "storageClass": "STANDARD",
+        "versioning": false,
+        "encryption": "SSE-S3",
+        "bytesUsed": 5600000000,
+        "requestsLast30d": 900000,
+        "egressGBLast30d": 5,
+        "publicAccess": false,
+        "tags": [{ "key": "env", "value": "staging" }],
+        "monthlyCostHint": 3.4
+      }
+    ],
+    "loadBalancers": [
+      {
+        "id": "lb-001",
+        "name": "web-lb",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app1",
+        "type": "L7",
+        "listeners": [
+          { "port": 443, "protocol": "HTTPS", "certificate": "example.com" }
+        ],
+        "targetGroups": [
+          { "name": "tg-web", "protocol": "HTTP", "port": 80, "targets": [{ "type": "vm", "id": "vm-001" }, { "type": "vm", "id": "vm-003" }], "healthCheck": { "path": "/", "intervalSec": 10, "timeoutSec": 3, "healthyThreshold": 3, "unhealthyThreshold": 3 } }
+        ],
+        "publicIPs": ["ip-002"],
+        "firewallIds": ["fw-006"],
+        "status": "active",
+        "tags": [{ "key": "env", "value": "prod" }],
+        "monthlyCostHint": 25
+      },
+      {
+        "id": "lb-002",
+        "name": "api-staging-lb",
+        "accountId": "acc-myco-a",
+        "projectId": "proj-app2",
+        "type": "L4",
+        "listeners": [
+          { "port": 80, "protocol": "TCP", "certificate": null }
+        ],
+        "targetGroups": [
+          { "name": "tg-api", "protocol": "TCP", "port": 80, "targets": [{ "type": "vm", "id": "vm-004" }], "healthCheck": { "path": null, "intervalSec": 15, "timeoutSec": 5, "healthyThreshold": 2, "unhealthyThreshold": 3 } }
+        ],
+        "publicIPs": ["ip-007"],
+        "firewallIds": ["fw-008"],
+        "status": "active",
+        "tags": [{ "key": "env", "value": "staging" }],
+        "monthlyCostHint": 15
+      }
+    ],
+    "bareMetals": [
+      {
+        "id": "bm-001",
+        "hostname": "dc1-hv-01",
+        "locationId": "dc1",
+        "cpu": "2x Intel Xeon E5-2690 v4 (28 cores)",
+        "cpuCores": 28,
+        "ramGB": 256,
+        "storage": [{ "type": "ssd", "sizeGB": 2000 }, { "type": "nvme", "sizeGB": 2000 }],
+        "storageTB": 4,
+        "gpus": [{ "model": "A6000", "count": 2 }],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.10",
+        "status": "ready",
+        "hostedVMs": ["vm-001"],
+        "usage": { "cpuCores": 4, "ramGB": 8, "storageTB": 0.1 },
+        "tags": [{ "key": "rack", "value": "R12" }]
+      },
+      {
+        "id": "bm-002",
+        "hostname": "dc1-hv-02",
+        "locationId": "dc1",
+        "cpu": "Intel Xeon Gold 6230 (20 cores)",
+        "cpuCores": 20,
+        "ramGB": 256,
+        "storage": [{ "type": "ssd", "sizeGB": 4000 }],
+        "storageTB": 4,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.11",
+        "status": "ready",
+        "hostedVMs": ["vm-003"],
+        "usage": { "cpuCores": 4, "ramGB": 8, "storageTB": 0.1 },
+        "tags": [{ "key": "rack", "value": "R12" }]
+      },
+      {
+        "id": "bm-003",
+        "hostname": "dc1-db-01",
+        "locationId": "dc1",
+        "cpu": "Intel Xeon Silver 4210 (10 cores)",
+        "cpuCores": 10,
+        "ramGB": 128,
+        "storage": [{ "type": "nvme", "sizeGB": 4000 }],
+        "storageTB": 4,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.20",
+        "status": "ready",
+        "hostedVMs": ["vm-005"],
+        "usage": { "cpuCores": 2, "ramGB": 4, "storageTB": 0.08 },
+        "tags": [{ "key": "rack", "value": "R10" }]
+      },
+      {
+        "id": "bm-004",
+        "hostname": "dc2-hv-03",
+        "locationId": "dc2",
+        "cpu": "AMD EPYC 7502P (32 cores)",
+        "cpuCores": 32,
+        "ramGB": 512,
+        "storage": [{ "type": "ssd", "sizeGB": 4000 }],
+        "storageTB": 4,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.1.20",
+        "status": "ready",
+        "hostedVMs": ["vm-004"],
+        "usage": { "cpuCores": 8, "ramGB": 16, "storageTB": 0.12 },
+        "tags": [{ "key": "rack", "value": "B3" }]
+      },
+      {
+        "id": "bm-005",
+        "hostname": "dc1-k8s-01",
+        "locationId": "dc1",
+        "cpu": "Intel Xeon Gold 6226R (16 cores)",
+        "cpuCores": 16,
+        "ramGB": 192,
+        "storage": [{ "type": "ssd", "sizeGB": 2000 }],
+        "storageTB": 2,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.30",
+        "status": "ready",
+        "hostedVMs": ["vm-007"],
+        "usage": { "cpuCores": 4, "ramGB": 8, "storageTB": 0.1 },
+        "tags": [{ "key": "rack", "value": "R14" }]
+      },
+      {
+        "id": "bm-006",
+        "hostname": "dc1-edge-01",
+        "locationId": "dc1",
+        "cpu": "Intel Xeon E-2278G (8 cores)",
+        "cpuCores": 8,
+        "ramGB": 64,
+        "storage": [{ "type": "nvme", "sizeGB": 2000 }],
+        "storageTB": 2,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.40",
+        "status": "ready",
+        "hostedVMs": ["vm-008"],
+        "usage": { "cpuCores": 2, "ramGB": 4, "storageTB": 0.08 },
+        "tags": [{ "key": "rack", "value": "E1" }]
+      },
+      {
+        "id": "bm-007",
+        "hostname": "dc2-hv-04",
+        "locationId": "dc2",
+        "cpu": "AMD EPYC 7513 (32 cores)",
+        "cpuCores": 32,
+        "ramGB": 512,
+        "storage": [{ "type": "ssd", "sizeGB": 8000 }],
+        "storageTB": 8,
+        "gpus": [],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.1.30",
+        "status": "provisioning",
+        "hostedVMs": [],
+        "usage": { "cpuCores": 0, "ramGB": 0, "storageTB": 0 },
+        "tags": [{ "key": "rack", "value": "C1" }]
+      },
+      {
+        "id": "bm-008",
+        "hostname": "dc1-gpu-01",
+        "locationId": "dc1",
+        "cpu": "Intel Xeon Gold 6248R (24 cores)",
+        "cpuCores": 24,
+        "ramGB": 384,
+        "storage": [{ "type": "nvme", "sizeGB": 4000 }],
+        "storageTB": 4,
+        "gpus": [{ "model": "A6000", "count": 4 }],
+        "hypervisor": "KVM",
+        "mgmtIP": "10.0.0.50",
+        "status": "ready",
+        "hostedVMs": [],
+        "usage": { "cpuCores": 0, "ramGB": 0, "storageTB": 0 },
+        "tags": [{ "key": "rack", "value": "G1" }]
+      }
+    ],
+    "providers": [
+      {
+        "id": "provider-hetzner",
+        "provider": "Hetzner",
+        "status": "connected",
+        "regions": ["nbg1", "hel1", "ash"],
+        "quotas": { "vms": 100, "ips": 200 },
+        "credentials": { "apiTokenMasked": "hzr_***abcd" },
+        "tags": []
+      },
+      {
+        "id": "provider-awsbm",
+        "provider": "AWS Bare Metal",
+        "status": "connected",
+        "regions": ["eu-central-1", "eu-west-1"],
+        "quotas": { "servers": 15 },
+        "credentials": { "accessKeyMasked": "AKIA***XYZ", "roleArnMasked": "arn:aws:iam:::role/autark" },
+        "tags": []
+      }
+    ],
+    "users": [
+      { "id": "user-001", "name": "Alice Admin", "email": "alice@example.com", "roles": ["role-admin"], "mfa": true, "status": "active", "lastLogin": "2025-10-24T09:00:00Z" },
+      { "id": "user-002", "name": "Bob Dev", "email": "bob@example.com", "roles": ["role-developer"], "mfa": false, "status": "active", "lastLogin": "2025-10-23T15:00:00Z" },
+      { "id": "user-003", "name": "Olivia Ops", "email": "olivia@example.com", "roles": ["role-ops"], "mfa": true, "status": "suspended", "lastLogin": "2025-10-12T11:30:00Z" },
+      { "id": "user-004", "name": "Charlie Infra", "email": "charlie@example.com", "roles": ["role-ops"], "mfa": true, "status": "active", "lastLogin": "2025-10-25T10:10:00Z" },
+      { "id": "user-005", "name": "Dana Data", "email": "dana@example.com", "roles": ["role-developer"], "mfa": true, "status": "active", "lastLogin": "2025-10-25T08:45:00Z" }
+    ],
+    "roles": [
+      {
+        "id": "role-admin",
+        "name": "Administrator",
+        "system": true,
+        "permissions": { "compute": ["*"], "storage": ["*"], "network": ["*"], "dns": ["*"], "db": ["*"], "k8s": ["*"], "objectStorage": ["*"], "loadBalancers": ["*"], "hardware": ["*"], "iam": ["*"], "billing": ["read"] },
+        "assignedUsers": ["user-001"]
+      },
+      {
+        "id": "role-developer",
+        "name": "Developer",
+        "system": false,
+        "permissions": { "compute": ["read", "create", "edit", "start", "stop"], "storage": ["read", "create", "edit"], "network": ["read"], "dns": ["read"], "db": ["read", "create", "edit"], "k8s": ["read", "create", "edit"], "objectStorage": ["read", "create"], "loadBalancers": ["read"], "hardware": ["read"], "iam": ["read"] },
+        "assignedUsers": ["user-002", "user-005"]
+      },
+      {
+        "id": "role-ops",
+        "name": "Operations",
+        "system": false,
+        "permissions": { "compute": ["*"], "storage": ["*"], "network": ["*"], "dns": ["*"], "db": ["*"], "k8s": ["*"], "objectStorage": ["*"], "loadBalancers": ["*"], "hardware": ["*"], "iam": ["read"] },
+        "assignedUsers": ["user-003", "user-004"]
+      }
+    ],
+    "systemAccounts": [
+      {
+        "id": "svc-001",
+        "name": "ci-cd",
+        "scopes": { "projects": ["proj-app1", "proj-app2"], "services": ["compute", "k8s", "objectStorage"] },
+        "keys": [{ "id": "key-001", "createdAt": "2025-10-01T10:00:00Z", "lastUsed": "2025-10-25T08:00:00Z" }],
+        "ipAllowlist": ["203.0.113.0/24"]
+      },
+      {
+        "id": "svc-002",
+        "name": "backup-agent",
+        "scopes": { "projects": ["proj-app1", "proj-ml"], "services": ["storage", "db"] },
+        "keys": [{ "id": "key-002", "createdAt": "2025-09-15T09:00:00Z", "lastUsed": "2025-10-25T02:10:00Z" }],
+        "ipAllowlist": ["10.0.0.0/8"]
+      }
+    ],
+    "projectAllowances": [
+      {
+        "id": "allow-proj-app1",
+        "projectId": "proj-app1",
+        "budgetMonthly": 500,
+        "quotas": { "vms": 20, "volumesTB": 5, "dbInstances": 5, "k8sClusters": 2, "buckets": 10, "elasticIPs": 20 },
+        "allowedServices": ["compute", "network", "storage", "db", "k8s", "objectStorage", "dns", "loadBalancers"],
+        "regionRestrictions": ["dc1", "dc2"],
+        "tagPolicies": { "requireKeys": ["env", "app"] }
+      },
+      {
+        "id": "allow-proj-ml",
+        "projectId": "proj-ml",
+        "budgetMonthly": 1500,
+        "quotas": { "vms": 50, "volumesTB": 50, "dbInstances": 8, "k8sClusters": 5, "buckets": 30, "elasticIPs": 40 },
+        "allowedServices": ["compute", "network", "storage", "db", "k8s", "objectStorage", "dns", "loadBalancers"],
+        "regionRestrictions": ["dc1", "dc2"],
+        "tagPolicies": { "requireKeys": ["env", "team"] }
+      },
+      {
+        "id": "allow-proj-app2",
+        "projectId": "proj-app2",
+        "budgetMonthly": 300,
+        "quotas": { "vms": 10, "volumesTB": 2, "dbInstances": 3, "k8sClusters": 1, "buckets": 5, "elasticIPs": 10 },
+        "allowedServices": ["compute", "network", "storage", "db", "objectStorage", "dns", "loadBalancers"],
+        "regionRestrictions": ["dc2"],
+        "tagPolicies": { "requireKeys": ["env"] }
+      }
+    ],
+    "auditLog": [
+      { "id": "evt-001", "when": "2025-10-25T07:30:00Z", "actor": "alice@example.com", "action": "vm.create", "target": "vm-001", "result": "success" },
+      { "id": "evt-002", "when": "2025-10-25T08:05:00Z", "actor": "system", "action": "backup.complete", "target": "vm-001", "result": "success" },
+      { "id": "evt-003", "when": "2025-10-25T09:10:00Z", "actor": "bob@example.com", "action": "db.modify", "target": "db-001", "result": "success" },
+      { "id": "evt-004", "when": "2025-10-25T09:40:00Z", "actor": "system", "action": "host.health.warn", "target": "bm-007", "result": "warning" },
+      { "id": "evt-005", "when": "2025-10-25T10:15:00Z", "actor": "charlie@example.com", "action": "lb.create", "target": "lb-002", "result": "success" },
+      { "id": "evt-006", "when": "2025-10-25T10:25:00Z", "actor": "alice@example.com", "action": "dns.record.add", "target": "zone-002/rec-101", "result": "success" },
+      { "id": "evt-007", "when": "2025-10-25T10:45:00Z", "actor": "dana@example.com", "action": "bucket.create", "target": "bkt-003", "result": "success" },
+      { "id": "evt-008", "when": "2025-10-25T11:05:00Z", "actor": "system", "action": "k8s.node.scale", "target": "k8s-001/np-1", "result": "success" }
+    ],
+    "notifications": [
+      { "id": "note-001", "level": "info", "title": "Backup completed", "message": "Daily backup finished for vm-001", "time": "2025-10-25T08:05:00Z" },
+      { "id": "note-002", "level": "warning", "title": "Host capacity", "message": "dc2-hv-03 is reaching 80% storage utilization.", "time": "2025-10-25T09:40:00Z" },
+      { "id": "note-003", "level": "info", "title": "New LB Active", "message": "api-staging-lb is now active.", "time": "2025-10-25T10:16:00Z" },
+      { "id": "note-004", "level": "info", "title": "DNS Updated", "message": "app.internal record api updated.", "time": "2025-10-25T10:26:00Z" }
+    ]
+  },
+  "pages": {
+    "/dashboard": {
+      "title": "Dashboard",
+      "description": "Overview of resources, health, and recent activity across the selected account and project.",
+      "cards": [
+        { "label": "Total VMs", "key": "vms", "icon": "🖥️" },
+        { "label": "Managed DBs", "key": "dbInstances", "icon": "🗄️" },
+        { "label": "Kubernetes Clusters", "key": "kubernetes", "icon": "☸️" },
+        { "label": "Monthly Estimate (€)", "key": "monthlyEstimate", "icon": "💶" }
+      ],
+      "charts": {
+        "costTrend": {
+          "title": "Estimated Cost (Last 7 days)",
+          "series": [420, 425, 430, 440, 445, 448, 462]
+        },
+        "capacity": {
+          "title": "Capacity Utilization",
+          "cpuPercent": 54,
+          "ramPercent": 61,
+          "storagePercent": 67
+        }
+      },
+      "recentActivity": {
+        "title": "Recent Activity",
+        "maxItems": 10
+      },
+      "health": {
+        "title": "System Health",
+        "items": [
+          { "label": "Compute", "status": "healthy" },
+          { "label": "Storage", "status": "healthy" },
+          { "label": "Network", "status": "degraded" },
+          { "label": "Managed Services", "status": "healthy" }
+        ]
+      }
+    },
+    "/infrastructure/vms": {
+      "title": "Virtual Machines",
+      "description": "Create and manage VMs across self-hosted and cloud providers.",
+      "list": {
+        "columns": ["Name", "Status", "vCPU/RAM", "Image", "IPs", "Volumes", "Firewalls", "Tags", "Monthly Cost (€)"],
+        "actions": ["Create VM", "Bulk Start", "Bulk Stop", "Delete"]
+      },
+      "createWizard": {
+        "title": "Create VM",
+        "steps": [
+          {
+            "id": "sizing",
+            "title": "Sizing",
+            "fields": [
+              { "id": "presetId", "label": "Preset", "type": "select", "optionsFrom": "presets.vm", "optional": true },
+              { "id": "vcpus", "label": "vCPUs", "type": "number", "min": 1, "showIf": "noPreset" },
+              { "id": "ramGB", "label": "RAM (GB)", "type": "number", "min": 1, "showIf": "noPreset" },
+              { "id": "systemDiskGB", "label": "System Disk (GB)", "type": "number", "min": 20, "showIf": "noPreset" }
+            ]
+          },
+          {
+            "id": "placement",
+            "title": "Placement",
+            "fields": [
+              { "id": "providerType", "label": "Underlying Server", "type": "radio", "options": ["selfHosted", "cloud"] },
+              { "id": "selfHostedLocationId", "label": "Data Center", "type": "select", "optionsFrom": "hardwareProviders.selfHosted", "showIf": "providerType=selfHosted" },
+              { "id": "cloudProviderId", "label": "Cloud Provider", "type": "select", "optionsFrom": "hardwareProviders.cloud", "showIf": "providerType=cloud" },
+              { "id": "cloudRegion", "label": "Cloud Region", "type": "select", "dependsOn": "cloudProviderId", "optionsFrom": "provider.regions", "showIf": "providerType=cloud" }
+            ]
+          },
+          {
+            "id": "gpu",
+            "title": "GPU",
+            "fields": [
+              { "id": "gpuModel", "label": "GPU Model", "type": "select", "options": ["None", "A6000", "H100", "H200"] },
+              { "id": "gpuCount", "label": "GPU Count", "type": "number", "min": 1, "showIf": "gpuModel!=None" }
+            ]
+          },
+          {
+            "id": "imageAccess",
+            "title": "Image & Access",
+            "fields": [
+              { "id": "image", "label": "Image", "type": "select", "options": ["ubuntu-22.04", "ubuntu-24.04", "debian-12", "debian-13", "fedora-41", "fedora-42", "suse-15", "windows-2022"] },
+              { "id": "sshKeyId", "label": "SSH key for root", "type": "select", "optionsFrom": "sshKeys" }
+            ]
+          },
+          {
+            "id": "networking",
+            "title": "Networking",
+            "fields": [
+              { "id": "networkId", "label": "Network (VPC)", "type": "select", "optionsFrom": "data.networks" },
+              { "id": "subnetId", "label": "Subnet", "type": "select", "dependsOn": "networkId", "optionsFrom": "network.subnets" },
+              { "id": "ipAssignments", "label": "Public IPs", "type": "multiSelect", "optionsFrom": "data.ipsAvailable" }
+            ]
+          },
+          {
+            "id": "storage",
+            "title": "Storage",
+            "fields": [
+              { "id": "attachVolumes", "label": "Attach volumes", "type": "volumeListEditor", "hint": "Add 0..N volumes by preset or custom size/type" }
+            ]
+          },
+          {
+            "id": "security",
+            "title": "Security & Backups",
+            "fields": [
+              { "id": "firewallIds", "label": "Firewall rules", "type": "multiSelect", "optionsFrom": "data.firewalls" },
+              { "id": "backupsEnabled", "label": "Backups", "type": "select", "options": ["no", "yes|daily", "yes|weekly"] },
+              { "id": "retention", "label": "Backup retention (copies)", "type": "number", "min": 1, "max": 30, "showIf": "backupsEnabled!=no" },
+              { "id": "initScriptId", "label": "Init script", "type": "select", "optionsFrom": "initScripts", "optional": true },
+              { "id": "tags", "label": "Tags", "type": "tags" }
+            ]
+          }
+        ],
+        "costPanel": {
+          "title": "Estimated monthly cost",
+          "breakdown": true
+        },
+        "provisioningSteps": [
+          "Connect to selected host/hypervisor",
+          "Allocate CPU/RAM and system disk",
+          "Attach volumes and GPUs",
+          "Configure network and assign IPs",
+          "Apply firewall and SSH access",
+          "Run init script",
+          "Power on and health check"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Metrics", "Networking", "Storage", "Security", "Backups", "Audit"],
+        "metrics": {
+          "cpu": [10, 25, 30, 40, 20, 15, 35, 45],
+          "ram": [35, 38, 40, 45, 50, 48, 46, 44],
+          "diskIO": [10, 12, 30, 20, 25, 15, 18, 22],
+          "netIO": [2, 3, 5, 4, 3, 6, 4, 5]
+        },
+        "actions": ["Start", "Stop", "Reboot", "Create Backup", "Edit", "Delete"]
+      },
+      "presetsPage": {
+        "title": "VM Presets",
+        "description": "Define reusable VM sizing presets."
+      }
+    },
+    "/infrastructure/volumes": {
+      "title": "Block Volumes",
+      "description": "Network-attached block storage volumes.",
+      "list": {
+        "columns": ["Name", "Type", "Size (GB)", "IOPS/Throughput", "Attached To", "Tags", "Snapshots", "Monthly Cost (€)"],
+        "actions": ["Create Volume", "Delete", "Create Snapshot"]
+      },
+      "createWizard": {
+        "title": "Create Volume",
+        "steps": [
+          {
+            "id": "basic",
+            "title": "Basic",
+            "fields": [
+              { "id": "name", "label": "Name", "type": "text" },
+              { "id": "presetId", "label": "Preset", "type": "select", "optionsFrom": "presets.volume", "optional": true },
+              { "id": "type", "label": "Type", "type": "select", "options": ["ssd", "nvme", "hdd"], "showIf": "noPreset" },
+              { "id": "sizeGB", "label": "Size (GB)", "type": "number", "min": 1, "showIf": "noPreset" }
+            ]
+          },
+          {
+            "id": "performance",
+            "title": "Performance",
+            "fields": [
+              { "id": "iops", "label": "IOPS", "type": "number", "min": 100 },
+              { "id": "throughputMBps", "label": "Throughput (MB/s)", "type": "number", "min": 10 }
+            ]
+          },
+          {
+            "id": "attachments",
+            "title": "Attachment",
+            "fields": [
+              { "id": "attachToVmId", "label": "Attach to VM", "type": "select", "optionsFrom": "data.vms", "optional": true }
+            ]
+          },
+          {
+            "id": "protection",
+            "title": "Protection",
+            "fields": [
+              { "id": "backupEnabled", "label": "Backups", "type": "toggle" },
+              { "id": "backupSchedule", "label": "Backup schedule", "type": "select", "options": ["daily", "weekly"], "showIf": "backupEnabled" },
+              { "id": "retention", "label": "Retention (copies)", "type": "number", "min": 1, "max": 30, "showIf": "backupEnabled" },
+              { "id": "tags", "label": "Tags", "type": "tags" }
+            ]
+          }
+        ],
+        "costPanel": { "title": "Estimated monthly cost", "breakdown": true },
+        "provisioningSteps": [
+          "Allocate volume in storage cluster",
+          "Provision requested IOPS/throughput",
+          "Attach to VM (if selected)",
+          "Initialize filesystem (optional)",
+          "Health check"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Performance", "Snapshots", "Audit"],
+        "metrics": {
+          "iops": [200, 350, 500, 300, 450, 400, 380, 420],
+          "throughput": [50, 70, 80, 65, 90, 85, 60, 75]
+        },
+        "actions": ["Attach", "Detach", "Expand", "Create Snapshot", "Delete"]
+      },
+      "presetsPage": {
+        "title": "Volume Presets",
+        "description": "Standardize storage configs for repeatable deployments."
+      }
+    },
+    "/infrastructure/networks": {
+      "title": "Networks (VPC)",
+      "description": "Virtual networks, subnets, and routing.",
+      "list": {
+        "columns": ["Name", "CIDR", "Subnets", "NAT", "Attached", "Tags"],
+        "actions": ["Create Network", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "name", "label": "Name", "type": "text" },
+          { "id": "cidr", "label": "CIDR", "type": "text", "placeholder": "10.0.0.0/16" },
+          { "id": "providerType", "label": "Provider", "type": "select", "options": ["selfHosted", "cloud"] },
+          { "id": "locationOrRegion", "label": "Data Center/Region", "type": "select", "optionsFrom": "hardwareProviders" },
+          { "id": "natGateway", "label": "NAT Gateway", "type": "toggle" },
+          { "id": "subnets", "label": "Subnets", "type": "listEditor", "itemSchema": ["name", "cidr", "public"] },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Subnets", "Routes", "Attachments", "Audit"]
+      }
+    },
+    "/infrastructure/ips": {
+      "title": "IP Addresses",
+      "description": "Manage elastic IPs and pools.",
+      "list": {
+        "columns": ["Address", "Version", "Pool", "Assigned To", "Tags", "Monthly Cost (€)"],
+        "actions": ["Allocate IPv4", "Allocate IPv6", "Release", "Assign", "Unassign"]
+      },
+      "allocateModal": {
+        "fields": [
+          { "id": "version", "label": "Version", "type": "radio", "options": ["IPv4", "IPv6"] },
+          { "id": "poolId", "label": "Pool", "type": "select", "optionsFrom": "ipPools" },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ]
+      }
+    },
+    "/infrastructure/firewalls": {
+      "title": "Firewalls",
+      "description": "Define and attach firewall rule sets.",
+      "list": {
+        "columns": ["Name", "Default", "Rules", "Attached To", "Tags"],
+        "actions": ["Create Firewall", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "name", "label": "Name", "type": "text" },
+          { "id": "defaultPolicy", "label": "Default Policy", "type": "radio", "options": ["allow", "deny"] },
+          { "id": "rules", "label": "Rules", "type": "listEditor", "itemSchema": ["direction", "protocol", "ports", "source", "destination", "action", "priority"] },
+          { "id": "attachedTo", "label": "Attach to", "type": "multiSelect", "optionsFrom": "attachableResources" },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ]
+      },
+      "detail": {
+        "tabs": ["Rules", "Attached", "Audit"]
+      }
+    },
+    "/infrastructure/dns": {
+      "title": "DNS Zones",
+      "description": "Manage zones and DNS records.",
+      "list": {
+        "columns": ["Zone", "Records", "Provider", "Monthly Cost (€)"],
+        "actions": ["Create Zone", "Delete Zone"]
+      },
+      "zoneDetail": {
+        "tabs": ["Records", "Settings", "Audit"],
+        "recordEditor": {
+          "fields": [
+            { "id": "type", "label": "Type", "type": "select", "options": ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"] },
+            { "id": "name", "label": "Name", "type": "text" },
+            { "id": "value", "label": "Value", "type": "text" },
+            { "id": "ttl", "label": "TTL (s)", "type": "number", "min": 60 }
+          ]
+        }
+      }
+    },
+    "/managed-services/db": {
+      "title": "Managed Databases",
+      "description": "Postgres, MySQL, Redis.",
+      "list": {
+        "columns": ["Name", "Engine/Version", "vCPU/RAM/Storage", "HA", "Endpoint", "Network", "Tags", "Monthly Cost (€)"],
+        "actions": ["Create DB", "Delete"]
+      },
+      "createWizard": {
+        "title": "Create DB Instance",
+        "steps": [
+          { "id": "engine", "title": "Engine", "fields": [{ "id": "engine", "label": "Engine", "type": "select", "options": ["postgres", "mysql", "redis"] }, { "id": "version", "label": "Version", "type": "select", "options": ["14", "15", "16"], "showIf": "engine=postgres" }] },
+          { "id": "sizing", "title": "Sizing", "fields": [{ "id": "presetId", "label": "Preset", "type": "select", "optionsFrom": "presets.db", "optional": true }, { "id": "vcpus", "label": "vCPUs", "type": "number", "min": 1, "showIf": "noPreset && engine!=redis" }, { "id": "ramGB", "label": "RAM (GB)", "type": "number", "min": 1 }, { "id": "storageGB", "label": "Storage (GB)", "type": "number", "min": 10, "showIf": "engine!=redis" }] },
+          { "id": "haBackup", "title": "Availability & Backups", "fields": [{ "id": "ha", "label": "High Availability", "type": "toggle" }, { "id": "backupsEnabled", "label": "Backups", "type": "toggle" }, { "id": "schedule", "label": "Schedule", "type": "select", "options": ["daily", "weekly"], "showIf": "backupsEnabled" }, { "id": "retention", "label": "Retention (copies)", "type": "number", "min": 1, "max": 30, "showIf": "backupsEnabled" }] },
+          { "id": "network", "title": "Networking", "fields": [{ "id": "networkId", "label": "Network", "type": "select", "optionsFrom": "data.networks" }, { "id": "subnetId", "label": "Subnet", "type": "select", "dependsOn": "networkId", "optionsFrom": "network.subnets" }, { "id": "firewallIds", "label": "Firewall", "type": "multiSelect", "optionsFrom": "data.firewalls" }] },
+          { "id": "access", "title": "Access", "fields": [{ "id": "users", "label": "Users", "type": "kvListEditor", "keyLabel": "username", "valueLabel": "role" }, { "id": "initSql", "label": "Init SQL", "type": "textarea", "optional": true }, { "id": "tags", "label": "Tags", "type": "tags" }] }
+        ],
+        "costPanel": { "title": "Estimated monthly cost", "breakdown": true },
+        "provisioningSteps": [
+          "Provision DB nodes",
+          "Configure storage and replication",
+          "Apply network/firewall",
+          "Run initialization",
+          "Expose endpoint",
+          "Health checks"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Users", "Metrics", "Backups", "Audit"],
+        "metrics": { "cpu": [5, 8, 10, 15, 9, 12, 7], "connections": [10, 12, 15, 18, 14, 16, 15], "latencyMs": [3, 4, 3, 5, 4, 3, 4] },
+        "actions": ["Restart", "Failover (HA)", "Create Backup", "Edit", "Delete"]
+      },
+      "presetsPage": { "title": "DB Presets", "description": "Reusable DB sizing profiles." }
+    },
+    "/managed-services/kubernetes": {
+      "title": "Kubernetes",
+      "description": "Managed Kubernetes clusters.",
+      "list": {
+        "columns": ["Name", "Version", "Control Plane", "Node Pools", "Network", "Tags", "Monthly Cost (€)"],
+        "actions": ["Create Cluster", "Delete"]
+      },
+      "createWizard": {
+        "title": "Create Cluster",
+        "steps": [
+          { "id": "version", "title": "Version", "fields": [{ "id": "version", "label": "Kubernetes Version", "type": "select", "options": ["1.28", "1.29", "1.30"] }] },
+          { "id": "controlPlane", "title": "Control Plane", "fields": [{ "id": "ha", "label": "High Availability", "type": "toggle" }, { "id": "size", "label": "Control Plane Size", "type": "select", "options": ["small"] }] },
+          { "id": "nodePools", "title": "Node Pools", "fields": [{ "id": "nodePools", "label": "Pools", "type": "nodePoolEditor", "optionsFrom": "presets.k8sNode" }] },
+          { "id": "network", "title": "Networking", "fields": [{ "id": "networkId", "label": "Network", "type": "select", "optionsFrom": "data.networks" }, { "id": "cni", "label": "CNI", "type": "select", "options": ["calico", "cilium"] }, { "id": "storageClass", "label": "Default Storage Class", "type": "select", "options": ["standard-ssd", "standard-hdd"] }] },
+          { "id": "addons", "title": "Add-ons & RBAC", "fields": [{ "id": "addons", "label": "Add-ons", "type": "multiToggle", "options": ["ingress", "metricsServer"] }, { "id": "tags", "label": "Tags", "type": "tags" }] }
+        ],
+        "costPanel": { "title": "Estimated monthly cost", "breakdown": true },
+        "provisioningSteps": [
+          "Provision control plane",
+          "Create node pools",
+          "Bootstrap networking (CNI)",
+          "Configure storage class",
+          "Install add-ons",
+          "Generate kubeconfig",
+          "Cluster health checks"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Nodes", "Workloads", "Metrics", "Access", "Audit"],
+        "metrics": { "apiLatencyMs": [20, 18, 22, 19, 17, 21, 20] },
+        "actions": ["Scale Node Pool", "Rotate Certificates", "Download kubeconfig", "Edit", "Delete"]
+      }
+    },
+    "/managed-services/object-storage": {
+      "title": "Object Storage",
+      "description": "S3-compatible buckets.",
+      "list": {
+        "columns": ["Bucket", "Region", "Class", "Versioning", "Bytes Used", "Tags", "Monthly Cost (€)"],
+        "actions": ["Create Bucket", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "name", "label": "Bucket Name", "type": "text" },
+          { "id": "region", "label": "Region", "type": "select", "options": ["dc1", "dc2"] },
+          { "id": "storageClass", "label": "Storage Class", "type": "select", "options": ["STANDARD", "INFREQUENT_ACCESS"] },
+          { "id": "versioning", "label": "Versioning", "type": "toggle" },
+          { "id": "encryption", "label": "Encryption", "type": "select", "options": ["SSE-S3", "SSE-C"] },
+          { "id": "lifecycle", "label": "Lifecycle Rules", "type": "listEditor", "itemSchema": ["prefix", "transitionDays", "toClass", "expireDays"] },
+          { "id": "publicAccess", "label": "Block Public Access", "type": "toggle" },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ],
+        "costPanel": { "title": "Estimated monthly cost", "breakdown": true }
+      },
+      "detail": {
+        "tabs": ["Overview", "Policies", "Lifecycle", "Access Keys", "Audit"],
+        "actions": ["Create Access Key", "Rotate Key", "Delete"]
+      }
+    },
+    "/managed-services/load-balancers": {
+      "title": "Load Balancers",
+      "description": "L4 and L7 load balancers.",
+      "list": {
+        "columns": ["Name", "Type", "Listeners", "Target Groups", "IPs", "Status", "Tags", "Monthly Cost (€)"],
+        "actions": ["Create Load Balancer", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "type", "label": "Type", "type": "radio", "options": ["L4", "L7"] },
+          { "id": "listeners", "label": "Listeners", "type": "listEditor", "itemSchema": ["port", "protocol", "certificate"] },
+          { "id": "targetGroups", "label": "Target Groups", "type": "lbTargetEditor", "targetsFrom": ["data.vms", "managed-services.kubernetes"] },
+          { "id": "allocateIP", "label": "Allocate Public IP", "type": "toggle" },
+          { "id": "firewallIds", "label": "Firewall", "type": "multiSelect", "optionsFrom": "data.firewalls" },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ],
+        "costPanel": { "title": "Estimated monthly cost", "breakdown": true },
+        "provisioningSteps": [
+          "Provision load balancer node",
+          "Configure listeners",
+          "Register targets and health checks",
+          "Assign IPs",
+          "Apply firewall",
+          "Activate"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Listeners", "Targets", "Metrics", "Audit"],
+        "metrics": { "rps": [50, 80, 60, 120, 90, 110, 100], "p95ms": [30, 35, 28, 40, 32, 34, 30] },
+        "actions": ["Add Listener", "Add Target", "Edit", "Delete"]
+      }
+    },
+    "/hardware/bare-metals": {
+      "title": "Bare Metal Hosts",
+      "description": "Self-hosted physical servers.",
+      "list": {
+        "columns": ["Hostname", "Location", "CPU", "RAM (GB)", "Storage", "GPU", "Hypervisor", "Status", "Tags"],
+        "actions": ["Add Server", "Delete"]
+      },
+      "createWizard": {
+        "title": "Add Bare Metal Server",
+        "steps": [
+          { "id": "identity", "title": "Identity", "fields": [{ "id": "hostname", "label": "Hostname", "type": "text" }, { "id": "locationId", "label": "Data Center", "type": "select", "optionsFrom": "hardwareProviders.selfHosted" }] },
+          { "id": "hardware", "title": "Hardware", "fields": [{ "id": "cpu", "label": "CPU", "type": "text" }, { "id": "ramGB", "label": "RAM (GB)", "type": "number", "min": 1 }, { "id": "storage", "label": "Storage", "type": "listEditor", "itemSchema": ["type", "sizeGB"] }, { "id": "gpus", "label": "GPUs", "type": "listEditor", "itemSchema": ["model", "count"] }] },
+          { "id": "management", "title": "Management", "fields": [{ "id": "hypervisor", "label": "Hypervisor", "type": "select", "options": ["KVM", "Proxmox", "Xen"] }, { "id": "mgmtIP", "label": "Mgmt IP", "type": "text" }, { "id": "tags", "label": "Tags", "type": "tags" }] }
+        ],
+        "provisioningSteps": [
+          "Validate hardware via IPMI",
+          "Install hypervisor",
+          "Register to resource pool",
+          "Run health checks"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Capacity", "Hosted VMs", "Audit"],
+        "actions": ["Run Health Check", "Drain Host", "Delete"]
+      }
+    },
+    "/hardware/cloud-providers": {
+      "title": "Cloud Providers",
+      "description": "Linked external providers (e.g., Hetzner, AWS Bare Metal).",
+      "list": {
+        "columns": ["Provider", "Regions", "Status", "Quotas", "Tags"],
+        "actions": ["Add Provider", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "provider", "label": "Provider", "type": "select", "options": ["Hetzner", "AWS Bare Metal"] },
+          { "id": "regions", "label": "Regions", "type": "multiSelect", "optionsFrom": "provider.regions" },
+          { "id": "credentials", "label": "Credentials", "type": "kvListEditor", "keyLabel": "key", "valueLabel": "value" },
+          { "id": "quotas", "label": "Quotas", "type": "kvListEditor", "keyLabel": "resource", "valueLabel": "limit" },
+          { "id": "tags", "label": "Tags", "type": "tags" }
+        ],
+        "provisioningSteps": [
+          "Validate credentials",
+          "Verify quotas",
+          "Discover regions",
+          "Finish linking"
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Quotas", "Discovered Resources", "Audit"],
+        "actions": ["Test Connection", "Sync", "Edit", "Delete"]
+      }
+    },
+    "/iam/users": {
+      "title": "User Accounts",
+      "description": "Manage human user access.",
+      "list": {
+        "columns": ["Name", "Email", "Roles", "MFA", "Status", "Last Login"],
+        "actions": ["Invite User", "Suspend", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "email", "label": "Email", "type": "email" },
+          { "id": "name", "label": "Display Name", "type": "text" },
+          { "id": "roles", "label": "Roles", "type": "multiSelect", "optionsFrom": "data.roles" },
+          { "id": "memberships", "label": "Account/Project Memberships", "type": "membershipEditor", "optionsFrom": ["accounts", "projects"] },
+          { "id": "mfa", "label": "Require MFA", "type": "toggle" }
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Activity", "Access Keys", "Audit"],
+        "actions": ["Reset MFA", "Generate Access Key", "Suspend", "Delete"]
+      }
+    },
+    "/iam/roles": {
+      "title": "Roles",
+      "description": "Role-based access control.",
+      "list": {
+        "columns": ["Name", "System", "Permissions", "Assigned Users"],
+        "actions": ["Create Role", "Delete"]
+      },
+      "createEdit": {
+        "permissionMatrix": {
+          "services": ["compute", "storage", "network", "dns", "db", "k8s", "objectStorage", "loadBalancers", "hardware", "iam", "billing"],
+          "actions": ["read", "list", "create", "edit", "delete", "attach", "detach", "start", "stop", "rotate", "*"]
+        },
+        "scope": ["accounts", "projects", "tags"]
+      },
+      "detail": {
+        "tabs": ["Permissions", "Assignments", "Audit"],
+        "actions": ["Edit", "Delete"]
+      }
+    },
+    "/iam/system-accounts": {
+      "title": "System Accounts",
+      "description": "Non-human service identities.",
+      "list": {
+        "columns": ["Name", "Scopes", "Keys", "Last Used"],
+        "actions": ["Create System Account", "Rotate Keys", "Delete"]
+      },
+      "createEdit": {
+        "fields": [
+          { "id": "name", "label": "Name", "type": "text" },
+          { "id": "scopes", "label": "Scopes", "type": "scopeEditor", "optionsFrom": ["accounts", "projects", "services"] },
+          { "id": "ipAllowlist", "label": "IP Allowlist", "type": "listEditor", "itemSchema": ["cidr"] }
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Keys", "Audit"],
+        "actions": ["Generate Key", "Revoke Key", "Delete"]
+      }
+    },
+    "/iam/project-allowances": {
+      "title": "Project Allowances",
+      "description": "Budgets, quotas, and policy constraints per project.",
+      "list": {
+        "columns": ["Project", "Monthly Budget (€)", "Quotas", "Allowed Services", "Regions"],
+        "actions": ["Edit Allowance"]
+      },
+      "edit": {
+        "fields": [
+          { "id": "budgetMonthly", "label": "Monthly Budget (€)", "type": "number", "min": 0 },
+          { "id": "quotas", "label": "Quotas", "type": "kvListEditor", "keyLabel": "resource", "valueLabel": "limit" },
+          { "id": "allowedServices", "label": "Allowed Services", "type": "multiSelect", "options": ["compute", "network", "storage", "db", "k8s", "objectStorage", "dns", "loadBalancers"] },
+          { "id": "regionRestrictions", "label": "Regions", "type": "multiSelect", "options": ["dc1", "dc2"] },
+          { "id": "tagPolicies", "label": "Tag Policies", "type": "kvListEditor", "keyLabel": "policy", "valueLabel": "value" }
+        ]
+      },
+      "detail": {
+        "tabs": ["Overview", "Consumption", "Audit"],
+        "charts": {
+          "budgetBurnDown": [50, 120, 180, 240, 300, 350, 410]
+        }
+      }
+    }
+  }
+}

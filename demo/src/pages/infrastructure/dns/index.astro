@@ -1,0 +1,47 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const zones = data.data.dnsZones || [];
+---
+
+<AutarkLayout
+  title="DNS Zones"
+  description="Manage zones and DNS records."
+  currentPath="/infrastructure/dns"
+>
+  <div class="mb-6 flex justify-end">
+    <a href="/infrastructure/dns/create" class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Zone
+    </a>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Zone</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Records</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {zones.map(zone => {
+          const cost = data.pricing.dns.zonePerMonth + (zone.records?.length || 0) * data.pricing.dns.recordPerMonth;
+          return (
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap">
+                <a href={`/infrastructure/dns/detail?id=${zone.id}`} class="text-sm font-medium text-primary hover:underline">{zone.name}</a>
+                <div class="text-xs text-gray-500">{zone.id}</div>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{zone.records?.length || 0}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{zone.provider}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">€{cost.toFixed(2)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

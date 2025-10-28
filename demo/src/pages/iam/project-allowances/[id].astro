@@ -1,0 +1,370 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const allowances = data.data.projectAllowances || [];
+  return allowances.map(allowance => ({
+    params: { id: allowance.id },
+    props: { allowance }
+  }));
+}
+
+const { allowance } = Astro.props;
+
+const project = data.projects.find(p => p.id === allowance.projectId);
+const account = project ? data.accounts.find(a => a.id === project.accountId) : null;
+
+// Calculate mock current usage
+const currentUsage = {
+  vms: data.data.vms.filter(v => v.projectId === allowance.projectId).length,
+  volumesTB: (data.data.volumes.filter(v => {
+    const vm = data.data.vms.find(vm => vm.id === v.attachedTo?.id);
+    return vm?.projectId === allowance.projectId;
+  }).reduce((sum, v) => sum + v.sizeGB, 0) / 1024).toFixed(2),
+  dbInstances: data.data.dbInstances.filter(d => d.projectId === allowance.projectId).length,
+  k8sClusters: data.data.kubernetes.filter(k => k.projectId === allowance.projectId).length,
+  buckets: data.data.buckets.filter(b => b.projectId === allowance.projectId).length,
+  elasticIPs: data.data.ips.filter(ip => {
+    if (ip.assignedTo?.type === 'vm') {
+      const vm = data.data.vms.find(v => v.id === ip.assignedTo.id);
+      return vm?.projectId === allowance.projectId;
+    }
+    return false;
+  }).length
+};
+
+// Mock budget burn-down (last 7 days)
+const budgetBurnDown = [50, 120, 180, 240, 300, 350, 410];
+const currentSpend = budgetBurnDown[budgetBurnDown.length - 1];
+const budgetPercentage = (currentSpend / allowance.budgetMonthly) * 100;
+
+// Mock daily costs
+const dailyCosts = {
+  compute: 25,
+  storage: 15,
+  db: 30,
+  k8s: 20,
+  objectStorage: 2,
+  network: 8
+};
+---
+
+<AutarkLayout
+  title={`${project?.name || 'Unknown Project'} Allowance`}
+  description={`Project Allowance ${allowance.id}`}
+  currentPath={`/iam/project-allowances/${allowance.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/iam/project-allowances" class="text-sm text-primary hover:underline">
+      ← Back to Project Allowances
+    </a>
+    <div class="flex gap-2">
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Edit Allowance
+      </button>
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Project Info</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Project</span>
+          <span class="text-sm font-medium">{project?.name || 'N/A'}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Account</span>
+          <span class="text-sm font-medium">{account?.name || 'N/A'}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Allowed Services</span>
+          <span class="text-sm font-medium">{allowance.allowedServices.length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Regions</span>
+          <span class="text-sm font-medium">{allowance.regionRestrictions.join(', ')}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Budget Status</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-gray-600">Monthly Budget</span>
+            <span class="font-medium">€{allowance.budgetMonthly}</span>
+          </div>
+          <div class="flex justify-between text-sm mb-2">
+            <span class="text-gray-600">Current Spend</span>
+            <span class={`font-bold ${budgetPercentage > 90 ? 'text-red-600' : budgetPercentage > 75 ? 'text-amber-600' : 'text-gray-900'}`}>
+              €{currentSpend}
+            </span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-3">
+            <div class={`rounded-full h-3 ${budgetPercentage > 90 ? 'bg-red-500' : budgetPercentage > 75 ? 'bg-amber-500' : 'bg-green-500'}`} style={`width: ${Math.min(budgetPercentage, 100)}%`}></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">
+            {Math.round(budgetPercentage)}% used • €{allowance.budgetMonthly - currentSpend} remaining
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Resource Usage</h3>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-600">VMs</span>
+          <span class="font-medium">{currentUsage.vms}/{allowance.quotas.vms}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600">DB Instances</span>
+          <span class="font-medium">{currentUsage.dbInstances}/{allowance.quotas.dbInstances}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600">K8s Clusters</span>
+          <span class="font-medium">{currentUsage.k8sClusters}/{allowance.quotas.k8sClusters}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600">Buckets</span>
+          <span class="font-medium">{currentUsage.buckets}/{allowance.quotas.buckets}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="overview">
+          Overview
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="consumption">
+          Consumption
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Overview Tab -->
+      <div id="overview-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">Allowance Configuration</h3>
+
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Budget</h4>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-gray-500">Monthly Limit</p>
+                  <p class="text-2xl font-bold text-gray-900 mt-1">€{allowance.budgetMonthly}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Current Month</p>
+                  <p class="text-2xl font-bold text-primary mt-1">€{currentSpend}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Resource Quotas</h4>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Object.entries(allowance.quotas).map(([resource, quota]) => {
+                const used = currentUsage[resource] || 0;
+                const percentage = (used / quota) * 100;
+                return (
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 capitalize mb-2">
+                      {resource.replace(/([A-Z])/g, ' $1').trim()}
+                    </p>
+                    <div class="flex items-baseline gap-2">
+                      <p class="text-2xl font-bold text-gray-900">{used}</p>
+                      <p class="text-sm text-gray-500">/ {quota}</p>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-1.5 mt-2">
+                      <div class={`rounded-full h-1.5 ${percentage > 80 ? 'bg-red-500' : percentage > 60 ? 'bg-amber-500' : 'bg-green-500'}`} style={`width: ${Math.min(percentage, 100)}%`}></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Allowed Services</h4>
+            <div class="flex flex-wrap gap-2">
+              {allowance.allowedServices.map(service => (
+                <span class="px-3 py-1 bg-blue-50 text-blue-700 rounded text-sm font-medium capitalize">
+                  {service}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Region Restrictions</h4>
+            <div class="flex flex-wrap gap-2">
+              {allowance.regionRestrictions.map(region => (
+                <span class="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium">
+                  {region}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Tag Policies</h4>
+            <div class="border border-gray-200 rounded-lg p-4">
+              {Object.entries(allowance.tagPolicies).map(([policy, value]) => (
+                <div class="mb-2 last:mb-0">
+                  <span class="text-sm font-medium capitalize">{policy.replace(/([A-Z])/g, ' $1').trim()}: </span>
+                  {Array.isArray(value) ? (
+                    <div class="flex flex-wrap gap-2 mt-1">
+                      {value.map(v => (
+                        <span class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{v}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span class="text-sm text-gray-600">{value}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Consumption Tab -->
+      <div id="consumption-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Budget & Resource Consumption</h3>
+
+        <div class="mb-6">
+          <h4 class="text-sm font-medium text-gray-700 mb-3">Budget Burn-Down (This Month)</h4>
+          <div class="border border-gray-200 rounded-lg p-4">
+            <div class="h-64 flex items-end space-x-2">
+              {budgetBurnDown.map((val, idx) => (
+                <div class="flex-1 flex flex-col items-center">
+                  <div class={`w-full rounded-t relative group ${val > allowance.budgetMonthly * 0.9 ? 'bg-red-500' : val > allowance.budgetMonthly * 0.75 ? 'bg-amber-500' : 'bg-green-500'}`} style={`height: ${(val / allowance.budgetMonthly) * 100}%`}>
+                    <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">€{val}</span>
+                  </div>
+                  <span class="text-xs text-gray-500 mt-2">Day {idx + 1}</span>
+                </div>
+              ))}
+              <div class="flex-1 flex flex-col items-center opacity-40">
+                <div class="w-full bg-gray-300 rounded-t" style={`height: ${(allowance.budgetMonthly / allowance.budgetMonthly) * 100}%`}></div>
+                <span class="text-xs text-gray-400 mt-2">Limit</span>
+              </div>
+            </div>
+            <div class="flex justify-between mt-4 pt-4 border-t border-gray-200">
+              <div>
+                <p class="text-xs text-gray-500">Projected End of Month</p>
+                <p class="text-lg font-bold text-gray-900 mt-1">
+                  €{Math.round(currentSpend * (30 / budgetBurnDown.length))}
+                </p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500">Daily Average</p>
+                <p class="text-lg font-bold text-gray-900 mt-1">
+                  €{Math.round(currentSpend / budgetBurnDown.length)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-sm font-medium text-gray-700 mb-3">Cost Breakdown by Service</h4>
+          <div class="space-y-3">
+            {Object.entries(dailyCosts).map(([service, cost]) => {
+              const monthlyEstimate = cost * 30;
+              const percentage = (monthlyEstimate / allowance.budgetMonthly) * 100;
+              return (
+                <div class="border border-gray-200 rounded-lg p-4">
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm font-medium capitalize">{service}</span>
+                    <div class="text-right">
+                      <p class="text-sm font-bold">€{cost}/day</p>
+                      <p class="text-xs text-gray-500">~€{monthlyEstimate}/mo</p>
+                    </div>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-primary rounded-full h-2" style={`width: ${Math.min(percentage, 100)}%`}></div>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">{Math.round(percentage)}% of monthly budget</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Project allowance created</p>
+            <p class="text-gray-500">admin@example.com - 2025-01-01 10:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Monthly budget set to €{allowance.budgetMonthly}</p>
+            <p class="text-gray-500">admin@example.com - 2025-01-01 10:05:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Quotas configured</p>
+            <p class="text-gray-500">admin@example.com - 2025-01-01 10:10:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-amber-500 pl-4 py-2">
+            <p class="font-medium">Budget threshold warning: 75% reached</p>
+            <p class="text-gray-500">System - 2025-10-22 08:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Tag policy updated</p>
+            <p class="text-gray-500">admin@example.com - 2025-10-23 14:30:00</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

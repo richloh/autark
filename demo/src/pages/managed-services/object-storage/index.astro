@@ -1,0 +1,51 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+import { calculateObjectStorageCost } from '../../../lib/pricing.js';
+
+const buckets = data.data.buckets || [];
+---
+
+<AutarkLayout
+  title="Object Storage"
+  description="S3-compatible buckets."
+  currentPath="/managed-services/object-storage"
+>
+  <div class="mb-6 flex justify-end">
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Bucket
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bucket</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Region</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Versioning</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Size</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {buckets.map(bucket => {
+          const sizeGB = (bucket.bytesUsed / (1024 * 1024 * 1024)).toFixed(2);
+          return (
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">{bucket.name}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{bucket.region}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{bucket.storageClass}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{bucket.versioning ? '✓' : '—'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{sizeGB} GB</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                €{calculateObjectStorageCost(bucket, data.pricing)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

@@ -1,0 +1,46 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import data from '../../../data/data.json';
+
+const providers = data.data.providers || [];
+---
+
+<AutarkLayout
+  title="Cloud Providers"
+  description="Linked external providers (e.g., Hetzner, AWS Bare Metal)."
+  currentPath="/hardware/cloud-providers"
+>
+  <div class="mb-6 flex justify-end">
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Add Provider
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provider</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Regions</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quotas</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {providers.map(provider => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">{provider.provider}</td>
+            <td class="px-6 py-4 text-sm">{provider.regions?.join(', ')}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <StatusBadge status={provider.status} />
+            </td>
+            <td class="px-6 py-4 text-sm">
+              {provider.quotas && Object.entries(provider.quotas).map(([key, val]) => `${key}: ${val}`).join(', ')}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

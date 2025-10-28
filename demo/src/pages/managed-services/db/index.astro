@@ -1,0 +1,69 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+import data from '../../../data/data.json';
+import { calculateDBCost } from '../../../lib/pricing.js';
+
+const dbInstances = data.data.dbInstances || [];
+---
+
+<AutarkLayout
+  title="Managed Databases"
+  description="Postgres, MySQL, Redis."
+  currentPath="/managed-services/db"
+>
+  <div class="mb-6 flex items-center justify-between">
+    <input
+      type="search"
+      placeholder="Search databases..."
+      class="border border-gray-300 rounded px-4 py-2 text-sm w-64"
+    />
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Database
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Engine</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Version</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Specs</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">HA</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endpoint</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {dbInstances.map(db => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-primary">{db.name}</div>
+              <div class="text-xs text-gray-500">{db.id}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{db.engine}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{db.version}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {db.vcpus > 0 && `${db.vcpus} vCPU / `}{db.ramGB} GB RAM
+              {db.storageGB > 0 && ` / ${db.storageGB} GB`}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {db.ha ? '✓' : '—'}
+            </td>
+            <td class="px-6 py-4 text-sm font-mono text-xs">{db.endpoint}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <StatusBadge status={db.status} />
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              €{calculateDBCost(db, data.pricing)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

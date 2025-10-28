@@ -1,0 +1,184 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+---
+
+<AutarkLayout
+  title="Network Details"
+  description="Network details and configuration"
+  currentPath="/infrastructure/networks"
+>
+  <div id="loading" class="text-center py-12">
+    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <p class="mt-4 text-gray-600">Loading network details...</p>
+  </div>
+
+  <div id="content" class="hidden">
+    <div class="mb-6 flex items-center justify-between">
+      <a href="/infrastructure/networks" class="text-sm text-primary hover:underline">← Back to Networks</a>
+      <div class="flex gap-2" id="actions"></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+        <h3 class="text-sm font-medium text-gray-500 mb-3">Network Configuration</h3>
+        <div class="space-y-3" id="network-config"></div>
+      </div>
+      <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+        <h3 class="text-sm font-medium text-gray-500 mb-3">NAT & Routing</h3>
+        <div class="space-y-3" id="nat-config"></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow border border-gray-200 mb-6">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold">Subnets</h3>
+      </div>
+      <div class="overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200" id="subnets-table"></table>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow border border-gray-200 mb-6">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold">Attached Resources</h3>
+      </div>
+      <div class="p-6" id="attached-resources"></div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow border border-gray-200">
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h3 class="text-lg font-semibold">Tags</h3>
+      </div>
+      <div class="p-6">
+        <div class="flex flex-wrap gap-2" id="tags"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="error" class="hidden text-center py-12">
+    <div class="text-danger text-4xl mb-4">⚠</div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">Network Not Found</h3>
+    <p class="text-gray-600 mb-4">The requested network could not be found.</p>
+    <a href="/infrastructure/networks" class="text-primary hover:underline">← Back to Networks</a>
+  </div>
+</AutarkLayout>
+
+<script>
+  import dataJson from '../../../data/data.json';
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const netId = urlParams.get('id');
+
+  function loadNetworkData() {
+    if (!netId) {
+      document.getElementById('loading')?.classList.add('hidden');
+      document.getElementById('error')?.classList.remove('hidden');
+      return;
+    }
+
+    const network = dataJson.data.networks.find((n: any) => n.id === netId);
+    if (!network) {
+      document.getElementById('loading')?.classList.add('hidden');
+      document.getElementById('error')?.classList.remove('hidden');
+      return;
+    }
+
+    document.title = `${network.name} - Autark`;
+
+    // Actions
+    document.getElementById('actions')!.innerHTML = `
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">Add Subnet</button>
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">Edit</button>
+      <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">Delete</button>
+    `;
+
+    // Network Config
+    document.getElementById('network-config')!.innerHTML = `
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Network ID</span><span class="text-sm font-medium font-mono">${network.id}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Name</span><span class="text-sm font-medium">${network.name}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">CIDR Block</span><span class="text-sm font-medium font-mono">${network.cidr}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Account</span><span class="text-sm font-medium">${network.accountId}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Project</span><span class="text-sm font-medium">${network.projectId}</span></div>
+    `;
+
+    // NAT Config
+    document.getElementById('nat-config')!.innerHTML = `
+      <div class="flex justify-between"><span class="text-sm text-gray-600">NAT Gateway</span><span class="text-sm font-medium">${network.natGateway ? 'Enabled' : 'Disabled'}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Internet Access</span><span class="text-sm font-medium">${network.natGateway ? 'Yes' : 'Private only'}</span></div>
+      <div class="flex justify-between"><span class="text-sm text-gray-600">Subnets</span><span class="text-sm font-medium">${network.subnets?.length || 0} configured</span></div>
+    `;
+
+    // Subnets Table
+    if (network.subnets && network.subnets.length > 0) {
+      document.getElementById('subnets-table')!.innerHTML = `
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CIDR</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Available IPs</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          ${network.subnets.map((subnet: any) => {
+            const cidrSize = parseInt(subnet.cidr.split('/')[1]);
+            const availableIps = Math.pow(2, 32 - cidrSize) - 5; // Reserve 5 IPs for AWS/cloud provider
+            return `
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">${subnet.name}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">${subnet.cidr}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${subnet.public ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                    ${subnet.public ? 'Public' : 'Private'}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${availableIps}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      `;
+    } else {
+      document.getElementById('subnets-table')!.innerHTML = '<tbody><tr><td class="px-6 py-4 text-sm text-gray-500">No subnets configured</td></tr></tbody>';
+    }
+
+    // Attached Resources
+    const attachedVms = dataJson.data.vms.filter((vm: any) =>
+      vm.networkConfig?.some((nc: any) => nc.networkId === netId)
+    );
+
+    if (attachedVms.length > 0) {
+      document.getElementById('attached-resources')!.innerHTML = `
+        <div class="space-y-2">
+          <h4 class="text-sm font-medium text-gray-700 mb-3">Virtual Machines (${attachedVms.length})</h4>
+          ${attachedVms.map((vm: any) => `
+            <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+              <div>
+                <a href="/infrastructure/vms/detail?id=${vm.id}" class="text-sm font-medium text-primary hover:underline">${vm.name}</a>
+                <span class="ml-2 text-xs text-gray-500">${vm.id}</span>
+              </div>
+              <span class="text-xs px-2 py-1 rounded ${vm.state === 'running' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">${vm.state}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      document.getElementById('attached-resources')!.innerHTML = '<p class="text-sm text-gray-500">No resources attached to this network</p>';
+    }
+
+    // Tags
+    if (network.tags && network.tags.length > 0) {
+      document.getElementById('tags')!.innerHTML = network.tags.map((tag: any) => `
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">${tag.key}: ${tag.value}</span>
+      `).join('');
+    } else {
+      document.getElementById('tags')!.innerHTML = '<p class="text-sm text-gray-500">No tags</p>';
+    }
+
+    document.getElementById('loading')?.classList.add('hidden');
+    document.getElementById('content')?.classList.remove('hidden');
+  }
+
+  loadNetworkData();
+</script>

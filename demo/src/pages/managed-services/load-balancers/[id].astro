@@ -1,0 +1,418 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const loadBalancers = data.data.loadBalancers || [];
+  return loadBalancers.map(lb => ({
+    params: { id: lb.id },
+    props: { lb }
+  }));
+}
+
+const { lb } = Astro.props;
+
+const project = data.projects.find(p => p.id === lb.projectId);
+const lbIPs = lb.publicIPs?.map(ipId => {
+  const ip = data.data.ips.find(i => i.id === ipId);
+  return ip;
+}).filter(Boolean) || [];
+
+const lbFirewalls = lb.firewallIds?.map(fwId => {
+  const fw = data.data.firewalls.find(f => f.id === fwId);
+  return fw;
+}).filter(Boolean) || [];
+
+// Get target resources
+const targets = lb.targetGroups.flatMap(tg =>
+  tg.targets.map(target => {
+    if (target.type === 'vm') {
+      const vm = data.data.vms.find(v => v.id === target.id);
+      return { ...target, resource: vm, groupName: tg.name };
+    }
+    return null;
+  }).filter(Boolean)
+);
+
+// Mock metrics
+const metrics = {
+  rps: [50, 80, 60, 120, 90, 110, 100, 95, 105, 115],
+  p95ms: [30, 35, 28, 40, 32, 34, 30, 33, 31, 29],
+  activeConnections: [120, 150, 130, 180, 160, 170, 155, 165, 175, 185]
+};
+---
+
+<AutarkLayout
+  title={lb.name}
+  description={`Load Balancer ${lb.id}`}
+  currentPath={`/managed-services/load-balancers/${lb.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/managed-services/load-balancers" class="text-sm text-primary hover:underline">
+      ← Back to Load Balancers
+    </a>
+    <div class="flex gap-2">
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Add Listener
+      </button>
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Add Target
+      </button>
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Edit
+      </button>
+      <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Configuration</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Status</span>
+          <StatusBadge status={lb.status} />
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Type</span>
+          <span class="text-sm font-medium">{lb.type}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Listeners</span>
+          <span class="text-sm font-medium">{lb.listeners.length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Target Groups</span>
+          <span class="text-sm font-medium">{lb.targetGroups.length}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Network</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Public IPs</span>
+          <span class="text-sm font-medium">{lbIPs.length}</span>
+        </div>
+        {lbIPs.map(ip => (
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">Address</span>
+            <span class="text-sm font-mono font-medium">{ip.address}</span>
+          </div>
+        ))}
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Firewalls</span>
+          <span class="text-sm font-medium">{lbFirewalls.length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Targets</span>
+          <span class="text-sm font-medium">{targets.length}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Project & Cost</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Project</span>
+          <span class="text-sm font-medium">{project?.name || 'N/A'}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Monthly Cost</span>
+          <span class="text-lg font-bold text-primary">€{lb.monthlyCostHint}</span>
+        </div>
+        <div class="text-xs text-gray-500 mt-2">
+          Based on {lb.type === 'L7' ? 'L7' : 'L4'} pricing + data processed
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="overview">
+          Overview
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="listeners">
+          Listeners ({lb.listeners.length})
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="targets">
+          Targets ({targets.length})
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="metrics">
+          Metrics
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Overview Tab -->
+      <div id="overview-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">Load Balancer Overview</h3>
+
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Public Endpoints</h4>
+            <div class="space-y-2">
+              {lbIPs.map(ip => (
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div>
+                    <span class="font-mono text-sm font-medium">{ip.address}</span>
+                    <span class="ml-2 text-xs text-gray-500">IPv{ip.version}</span>
+                  </div>
+                  <a href={`/infrastructure/ips`} class="text-sm text-primary hover:underline">
+                    View IP
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Security</h4>
+            <div class="space-y-2">
+              {lbFirewalls.map(fw => (
+                <div class="p-3 bg-gray-50 rounded">
+                  <div class="flex items-center justify-between">
+                    <a href={`/infrastructure/firewalls/${fw.id}`} class="text-sm font-medium text-primary hover:underline">
+                      {fw.name}
+                    </a>
+                    <span class="text-xs text-gray-500">{fw.rules.length} rules</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Tags</h4>
+            <div class="flex flex-wrap gap-2">
+              {lb.tags && lb.tags.length > 0 ? (
+                lb.tags.map(tag => <TagBadge tag={tag} />)
+              ) : (
+                <p class="text-sm text-gray-500">No tags</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Listeners Tab -->
+      <div id="listeners-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Listeners</h3>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Add Listener
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          {lb.listeners.map((listener, idx) => (
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="flex justify-between items-start">
+                <div>
+                  <div class="flex items-center gap-3 mb-2">
+                    <span class="text-sm font-medium">Port {listener.port}</span>
+                    <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                      {listener.protocol}
+                    </span>
+                  </div>
+                  {listener.certificate && (
+                    <p class="text-sm text-gray-600">Certificate: {listener.certificate}</p>
+                  )}
+                  <p class="text-sm text-gray-500 mt-1">
+                    {listener.protocol === 'HTTPS' || listener.protocol === 'TLS' ? 'Encrypted traffic' : 'Unencrypted traffic'}
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    Edit
+                  </button>
+                  <button class="px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50">
+                    Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Targets Tab -->
+      <div id="targets-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Target Groups & Health</h3>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Add Target
+          </button>
+        </div>
+
+        {lb.targetGroups.map(tg => (
+          <div class="mb-6">
+            <div class="border-b border-gray-200 pb-2 mb-3">
+              <h4 class="font-medium text-gray-900">{tg.name}</h4>
+              <div class="flex gap-4 text-sm text-gray-600 mt-1">
+                <span>Protocol: {tg.protocol}</span>
+                <span>Port: {tg.port}</span>
+              </div>
+            </div>
+
+            <div class="space-y-2 mb-4">
+              {tg.targets.map(target => {
+                const resource = target.type === 'vm' ? data.data.vms.find(v => v.id === target.id) : null;
+                return resource ? (
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div>
+                      <a href={`/infrastructure/vms/${resource.id}`} class="text-sm font-medium text-primary hover:underline">
+                        {resource.name}
+                      </a>
+                      <p class="text-xs text-gray-500 mt-1">Status: {resource.status}</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                      <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                        Healthy
+                      </span>
+                      <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : null;
+              })}
+            </div>
+
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded">
+              <p class="text-sm font-medium text-blue-900 mb-1">Health Check Configuration</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-blue-800">
+                {tg.healthCheck.path && (
+                  <div>
+                    <span class="text-blue-600">Path:</span> {tg.healthCheck.path}
+                  </div>
+                )}
+                <div>
+                  <span class="text-blue-600">Interval:</span> {tg.healthCheck.intervalSec}s
+                </div>
+                <div>
+                  <span class="text-blue-600">Timeout:</span> {tg.healthCheck.timeoutSec}s
+                </div>
+                <div>
+                  <span class="text-blue-600">Threshold:</span> {tg.healthCheck.healthyThreshold}/{tg.healthCheck.unhealthyThreshold}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Metrics Tab -->
+      <div id="metrics-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Performance Metrics (Last 24 hours)</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Requests per Second</h4>
+            <div class="h-48 flex items-end space-x-2">
+              {metrics.rps.map(val => (
+                <div class="flex-1 bg-primary rounded-t relative group" style={`height: ${(val / Math.max(...metrics.rps)) * 100}%`} title={`${val} req/s`}>
+                  <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">{val}</span>
+                </div>
+              ))}
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Average: {Math.round(metrics.rps.reduce((a,b) => a+b, 0) / metrics.rps.length)} req/s</p>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">P95 Latency (ms)</h4>
+            <div class="h-48 flex items-end space-x-2">
+              {metrics.p95ms.map(val => (
+                <div class="flex-1 bg-accent rounded-t relative group" style={`height: ${(val / Math.max(...metrics.p95ms)) * 100}%`} title={`${val} ms`}>
+                  <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">{val}</span>
+                </div>
+              ))}
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Average: {Math.round(metrics.p95ms.reduce((a,b) => a+b, 0) / metrics.p95ms.length)} ms</p>
+          </div>
+
+          <div class="md:col-span-2">
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Active Connections</h4>
+            <div class="h-48 flex items-end space-x-2">
+              {metrics.activeConnections.map(val => (
+                <div class="flex-1 bg-blue-500 rounded-t relative group" style={`height: ${(val / Math.max(...metrics.activeConnections)) * 100}%`} title={`${val} connections`}>
+                  <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">{val}</span>
+                </div>
+              ))}
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Average: {Math.round(metrics.activeConnections.reduce((a,b) => a+b, 0) / metrics.activeConnections.length)} connections</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Load balancer created</p>
+            <p class="text-gray-500">admin@example.com - 2025-10-10 12:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Listener added: HTTPS:443</p>
+            <p class="text-gray-500">admin@example.com - 2025-10-10 12:15:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Target added to {lb.targetGroups[0]?.name}</p>
+            <p class="text-gray-500">ops@example.com - 2025-10-11 09:30:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Health check configuration updated</p>
+            <p class="text-gray-500">ops@example.com - 2025-10-15 14:20:00</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

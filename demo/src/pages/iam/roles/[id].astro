@@ -1,0 +1,298 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const roles = data.data.roles || [];
+  return roles.map(role => ({
+    params: { id: role.id },
+    props: { role }
+  }));
+}
+
+const { role } = Astro.props;
+
+// Get assigned users
+const assignedUsers = role.assignedUsers?.map(userId => {
+  const user = data.data.users.find(u => u.id === userId);
+  return user;
+}).filter(Boolean) || [];
+
+// Permission categories
+const permissionCategories = {
+  'Infrastructure': ['compute', 'storage', 'network'],
+  'Managed Services': ['db', 'k8s', 'objectStorage', 'loadBalancers', 'dns'],
+  'Hardware & IAM': ['hardware', 'iam', 'billing']
+};
+
+// Available actions
+const allActions = ['read', 'list', 'create', 'edit', 'delete', 'attach', 'detach', 'start', 'stop', 'rotate', '*'];
+---
+
+<AutarkLayout
+  title={role.name}
+  description={`Role ${role.id}`}
+  currentPath={`/iam/roles/${role.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/iam/roles" class="text-sm text-primary hover:underline">
+      ← Back to Roles
+    </a>
+    <div class="flex gap-2">
+      {!role.system && (
+        <>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Edit
+          </button>
+          <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">
+            Delete
+          </button>
+        </>
+      )}
+      {role.system && (
+        <span class="px-4 py-2 bg-blue-100 text-blue-700 rounded text-sm font-medium">
+          System Role (Read-only)
+        </span>
+      )}
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Role Info</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Name</span>
+          <span class="text-sm font-medium">{role.name}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Type</span>
+          <span class={`px-2 py-1 rounded text-xs font-medium ${role.system ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'}`}>
+            {role.system ? 'System' : 'Custom'}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Assigned Users</span>
+          <span class="text-sm font-medium">{assignedUsers.length}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Permissions Summary</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Services</span>
+          <span class="text-sm font-medium">{Object.keys(role.permissions).length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Full Access (*)</span>
+          <span class="text-sm font-medium">
+            {Object.values(role.permissions).filter(p => Array.isArray(p) && p.includes('*')).length}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Read-only</span>
+          <span class="text-sm font-medium">
+            {Object.values(role.permissions).filter(p => Array.isArray(p) && p.includes('read') && !p.includes('*')).length}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Scope</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Account Level</span>
+          <span class="text-sm font-medium text-green-600">Yes</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Project Level</span>
+          <span class="text-sm font-medium text-green-600">Yes</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Created</span>
+          <span class="text-sm font-medium">2025-01-01</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="permissions">
+          Permissions
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="assignments">
+          Assignments ({assignedUsers.length})
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Permissions Tab -->
+      <div id="permissions-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">Permission Matrix</h3>
+
+        {Object.entries(permissionCategories).map(([category, services]) => (
+          <div class="mb-6">
+            <h4 class="text-sm font-medium text-gray-700 mb-3 pb-2 border-b border-gray-200">{category}</h4>
+            <div class="space-y-3">
+              {services.map(service => {
+                const perms = role.permissions[service];
+                const hasPermission = perms !== undefined;
+                const isFullAccess = Array.isArray(perms) && perms.includes('*');
+                const permList = Array.isArray(perms) ? perms : [];
+
+                return (
+                  <div class="border border-gray-200 rounded-lg p-4">
+                    <div class="flex items-start justify-between mb-2">
+                      <div>
+                        <p class="text-sm font-medium capitalize">{service}</p>
+                        {!hasPermission && (
+                          <p class="text-xs text-gray-500 mt-1">No access</p>
+                        )}
+                      </div>
+                      {isFullAccess && (
+                        <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          Full Access
+                        </span>
+                      )}
+                    </div>
+                    {hasPermission && !isFullAccess && (
+                      <div class="flex flex-wrap gap-2 mt-2">
+                        {permList.map(perm => (
+                          <span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                            {perm}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {!role.system && (
+          <div class="mt-6">
+            <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+              Edit Permissions
+            </button>
+          </div>
+        )}
+      </div>
+
+      <!-- Assignments Tab -->
+      <div id="assignments-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Assigned Users</h3>
+          {!role.system && (
+            <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+              Assign User
+            </button>
+          )}
+        </div>
+
+        {assignedUsers.length > 0 ? (
+          <div class="space-y-3">
+            {assignedUsers.map(user => (
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <a href={`/iam/users/${user.id}`} class="font-medium text-primary hover:underline">
+                      {user.name}
+                    </a>
+                    <p class="text-sm text-gray-600 mt-1">{user.email}</p>
+                    <div class="flex gap-4 mt-2 text-xs text-gray-600">
+                      <span>Status: <span class={`font-medium ${user.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>{user.status}</span></span>
+                      <span>MFA: {user.mfa ? 'Enabled' : 'Disabled'}</span>
+                      <span>Last login: {new Date(user.lastLogin).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  {!role.system && (
+                    <button class="px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50">
+                      Remove
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="text-center py-8">
+            <p class="text-gray-500 mb-4">No users assigned to this role</p>
+            {!role.system && (
+              <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+                Assign First User
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Role {role.system ? 'created' : 'defined'}</p>
+            <p class="text-gray-500">{role.system ? 'System' : 'admin@example.com'} - 2025-01-01 10:00:00</p>
+          </div>
+          {assignedUsers.map((user, idx) => (
+            <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+              <p class="font-medium">User assigned: {user.name}</p>
+              <p class="text-gray-500">admin@example.com - 2025-0{idx + 1}-15 10:00:00</p>
+            </div>
+          ))}
+          {!role.system && (
+            <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+              <p class="font-medium">Permissions modified</p>
+              <p class="text-gray-500">admin@example.com - 2025-02-01 14:30:00</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

@@ -1,0 +1,8 @@
+---
+const { tag } = Astro.props;
+---
+
+<span class="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
+  <span class="font-medium">{tag.key}:</span>
+  <span>{tag.value}</span>
+</span>

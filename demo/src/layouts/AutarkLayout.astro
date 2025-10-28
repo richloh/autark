@@ -1,0 +1,255 @@
+---
+import data from '../data/data.json';
+
+const { title, description, currentPath = '/' } = Astro.props;
+
+const navigation = [
+  {
+    label: 'Dashboard',
+    path: '/dashboard',
+    icon: '📊'
+  },
+  {
+    label: 'Infrastructure',
+    expanded: true,
+    children: [
+      { label: 'Virtual Machines', path: '/infrastructure/vms', icon: '🖥️' },
+      { label: 'Volumes', path: '/infrastructure/volumes', icon: '💾' },
+      { label: 'Networks', path: '/infrastructure/networks', icon: '🌐' },
+      { label: 'IP Addresses', path: '/infrastructure/ips', icon: '🔢' },
+      { label: 'Firewalls', path: '/infrastructure/firewalls', icon: '🔥' },
+      { label: 'DNS', path: '/infrastructure/dns', icon: '🌍' },
+    ]
+  },
+  {
+    label: 'Managed Services',
+    expanded: true,
+    children: [
+      { label: 'Databases', path: '/managed-services/db', icon: '🗄️' },
+      { label: 'Kubernetes', path: '/managed-services/kubernetes', icon: '☸️' },
+      { label: 'Object Storage', path: '/managed-services/object-storage', icon: '🪣' },
+      { label: 'Load Balancers', path: '/managed-services/load-balancers', icon: '⚖️' },
+    ]
+  },
+  {
+    label: 'Hardware',
+    expanded: false,
+    children: [
+      { label: 'Bare Metal Hosts', path: '/hardware/bare-metals', icon: '🏭' },
+      { label: 'Cloud Providers', path: '/hardware/cloud-providers', icon: '☁️' },
+    ]
+  },
+  {
+    label: 'IAM',
+    expanded: false,
+    children: [
+      { label: 'Users', path: '/iam/users', icon: '👤' },
+      { label: 'Roles', path: '/iam/roles', icon: '🎭' },
+      { label: 'System Accounts', path: '/iam/system-accounts', icon: '🤖' },
+      { label: 'Project Allowances', path: '/iam/project-allowances', icon: '💰' },
+    ]
+  }
+];
+
+function generateBreadcrumbs(path) {
+  const parts = path.split('/').filter(Boolean);
+  const crumbs = [{ label: 'Home', path: '/' }];
+
+  let currentPath = '';
+  parts.forEach((part, index) => {
+    currentPath += `/${part}`;
+    const label = part.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    crumbs.push({ label, path: currentPath });
+  });
+
+  return crumbs;
+}
+
+const breadcrumbs = generateBreadcrumbs(currentPath);
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title ? `${title} - ${data.app.name}` : data.app.name}</title>
+  <meta name="description" content={description || data.app.tagline}>
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+  <div class="min-h-screen flex flex-col">
+    <!-- Top Bar -->
+    <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div class="flex items-center justify-between px-4 py-3">
+        <div class="flex items-center gap-4">
+          <h1 class="text-xl font-bold text-primary">{data.app.name}</h1>
+          <span class="text-xs text-muted">{data.app.tagline}</span>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <!-- Account Selector -->
+          <select id="account-selector" class="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+            {data.accounts.map(account => (
+              <option value={account.id}>{account.name}</option>
+            ))}
+          </select>
+
+          <!-- Project Selector -->
+          <select id="project-selector" class="border border-gray-300 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+            <option value="">All Projects</option>
+            {data.projects.map(project => (
+              <option value={project.id}>{project.name}</option>
+            ))}
+          </select>
+
+          <!-- Global Search -->
+          <input
+            type="search"
+            id="global-search"
+            placeholder="Search..."
+            class="border border-gray-300 rounded px-3 py-1 text-sm w-48 focus:ring-2 focus:ring-primary focus:border-transparent"
+          />
+
+          <!-- Notifications -->
+          <button class="relative p-2 hover:bg-gray-100 rounded" title="Notifications">
+            <span class="text-xl">🔔</span>
+            {data.data.notifications && data.data.notifications.length > 0 && (
+              <span class="absolute top-1 right-1 bg-danger text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                {data.data.notifications.length}
+              </span>
+            )}
+          </button>
+
+          <!-- User Avatar -->
+          <button class="p-2 hover:bg-gray-100 rounded" title="User menu">
+            <span class="text-xl">👤</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex flex-1">
+      <!-- Sidebar -->
+      <aside class="w-64 bg-white border-r border-gray-200 overflow-y-auto hidden md:block">
+        <nav class="p-4 space-y-1">
+          {navigation.map(section => (
+            <div>
+              {section.path ? (
+                <a
+                  href={section.path}
+                  class={`flex items-center gap-2 px-3 py-2 rounded text-sm font-medium ${
+                    currentPath === section.path
+                      ? 'bg-primary text-white'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <span>{section.icon}</span>
+                  <span>{section.label}</span>
+                </a>
+              ) : (
+                <>
+                  <div class="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    {section.label}
+                  </div>
+                  {section.children && (
+                    <div class="ml-2 space-y-1">
+                      {section.children.map(child => (
+                        <a
+                          href={child.path}
+                          class={`flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                            currentPath === child.path || currentPath.startsWith(child.path + '/')
+                              ? 'bg-primary text-white'
+                              : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <span>{child.icon}</span>
+                          <span>{child.label}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 overflow-y-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <!-- Breadcrumbs -->
+          {breadcrumbs.length > 1 && (
+            <nav class="mb-4 text-sm">
+              <ol class="flex items-center gap-2 text-gray-500">
+                {breadcrumbs.map((crumb, index) => (
+                  <>
+                    {index > 0 && <span>/</span>}
+                    {index === breadcrumbs.length - 1 ? (
+                      <li class="font-medium text-gray-900">{crumb.label}</li>
+                    ) : (
+                      <li>
+                        <a href={crumb.path} class="hover:text-primary">{crumb.label}</a>
+                      </li>
+                    )}
+                  </>
+                ))}
+              </ol>
+            </nav>
+          )}
+
+          <!-- Page Header -->
+          {title && (
+            <div class="mb-6">
+              <h2 class="text-2xl font-bold text-gray-900">{title}</h2>
+              {description && <p class="mt-1 text-sm text-gray-600">{description}</p>}
+            </div>
+          )}
+
+          <!-- Page Content -->
+          <slot />
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Initialize State -->
+  <script is:inline define:vars={{ initialData: data }}>
+    window.__INITIAL_STATE__ = initialData;
+  </script>
+
+  <!-- Client-side Scripts -->
+  <script>
+    import { mergeData, setState, getState } from '../lib/state.js';
+
+    if (typeof window !== 'undefined') {
+      const merged = mergeData(window.__INITIAL_STATE__);
+      window.__DATA__ = merged;
+
+      const accountSelector = document.getElementById('account-selector');
+      const projectSelector = document.getElementById('project-selector');
+
+      const savedAccount = getState().selectedAccount || merged.accounts[0]?.id;
+      const savedProject = getState().selectedProject || '';
+
+      if (accountSelector && savedAccount) {
+        accountSelector.value = savedAccount;
+      }
+
+      if (projectSelector && savedProject) {
+        projectSelector.value = savedProject;
+      }
+
+      accountSelector?.addEventListener('change', (e) => {
+        setState({ selectedAccount: e.target.value });
+        window.location.reload();
+      });
+
+      projectSelector?.addEventListener('change', (e) => {
+        setState({ selectedProject: e.target.value });
+        window.location.reload();
+      });
+    }
+  </script>
+</body>
+</html>

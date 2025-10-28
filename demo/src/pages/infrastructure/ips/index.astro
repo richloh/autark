@@ -1,0 +1,52 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const ips = data.data.ips || [];
+---
+
+<AutarkLayout
+  title="IP Addresses"
+  description="Manage elastic IPs and pools."
+  currentPath="/infrastructure/ips"
+>
+  <div class="mb-6 flex justify-end gap-2">
+    <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+      Allocate IPv6
+    </button>
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Allocate IPv4
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Address</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Version</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pool</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {ips.map(ip => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-mono font-medium">{ip.address}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">IPv{ip.version}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{ip.poolId}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {ip.assignedTo ? `${ip.assignedTo.type}: ${ip.assignedTo.id}` : (
+                <span class="text-gray-400">Unassigned</span>
+              )}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              €{ip.version === 4 ? data.pricing.ip.elasticIPv4PerMonth : data.pricing.ip.elasticIPv6PerMonth}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

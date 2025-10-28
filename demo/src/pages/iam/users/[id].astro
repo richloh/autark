@@ -1,0 +1,386 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const users = data.data.users || [];
+  return users.map(user => ({
+    params: { id: user.id },
+    props: { user }
+  }));
+}
+
+const { user } = Astro.props;
+
+// Get assigned roles
+const assignedRoles = user.roles?.map(roleId => {
+  const role = data.data.roles.find(r => r.id === roleId);
+  return role;
+}).filter(Boolean) || [];
+
+// Mock access keys
+const mockAccessKeys = user.id === 'user-001' ? [
+  { id: 'ak-001', name: 'CLI Access', created: '2025-09-15', lastUsed: '2025-10-25' }
+] : [];
+
+// Mock activity log
+const activityLog = [
+  { action: 'Login', resource: 'Web Console', timestamp: '2025-10-25 09:00:00', result: 'success' },
+  { action: 'VM Created', resource: 'web-3', timestamp: '2025-10-24 14:30:00', result: 'success' },
+  { action: 'Volume Attached', resource: 'vol-008', timestamp: '2025-10-24 14:35:00', result: 'success' },
+  { action: 'Login', resource: 'Web Console', timestamp: '2025-10-23 08:45:00', result: 'success' },
+  { action: 'Firewall Modified', resource: 'fw-002', timestamp: '2025-10-22 16:20:00', result: 'success' }
+];
+---
+
+<AutarkLayout
+  title={user.name}
+  description={`User Account ${user.id}`}
+  currentPath={`/iam/users/${user.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/iam/users" class="text-sm text-primary hover:underline">
+      ← Back to Users
+    </a>
+    <div class="flex gap-2">
+      {user.status === 'suspended' ? (
+        <button class="px-4 py-2 bg-accent text-white rounded text-sm font-medium hover:bg-green-600">
+          Activate
+        </button>
+      ) : (
+        <button class="px-4 py-2 bg-amber-600 text-white rounded text-sm font-medium hover:bg-amber-700">
+          Suspend
+        </button>
+      )}
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Reset MFA
+      </button>
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Generate Access Key
+      </button>
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Edit
+      </button>
+      <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Account Info</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Status</span>
+          <StatusBadge status={user.status} />
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Email</span>
+          <span class="text-sm font-medium">{user.email}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">MFA</span>
+          <span class={`text-sm font-medium ${user.mfa ? 'text-green-600' : 'text-amber-600'}`}>
+            {user.mfa ? 'Enabled' : 'Disabled'}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Last Login</span>
+          <span class="text-sm font-medium">{new Date(user.lastLogin).toLocaleDateString()}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Roles & Permissions</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Assigned Roles</span>
+          <span class="text-sm font-medium">{assignedRoles.length}</span>
+        </div>
+        <div class="space-y-2">
+          {assignedRoles.map(role => (
+            <div>
+              <a href={`/iam/roles/${role.id}`} class="text-sm font-medium text-primary hover:underline">
+                {role.name}
+              </a>
+              {role.system && (
+                <span class="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">System</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Access</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Access Keys</span>
+          <span class="text-sm font-medium">{mockAccessKeys.length}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Console Access</span>
+          <span class="text-sm font-medium text-green-600">Enabled</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">API Access</span>
+          <span class="text-sm font-medium text-green-600">Enabled</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="overview">
+          Overview
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="activity">
+          Activity
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="access-keys">
+          Access Keys ({mockAccessKeys.length})
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Overview Tab -->
+      <div id="overview-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">User Details</h3>
+
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Personal Information</h4>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <p class="text-sm text-gray-500">Full Name</p>
+                  <p class="text-sm font-medium mt-1">{user.name}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Email Address</p>
+                  <p class="text-sm font-medium mt-1">{user.email}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Account Created</p>
+                  <p class="text-sm font-medium mt-1">2025-01-15</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Last Login</p>
+                  <p class="text-sm font-medium mt-1">{user.lastLogin}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Assigned Roles</h4>
+            <div class="space-y-3">
+              {assignedRoles.map(role => (
+                <div class="border border-gray-200 rounded-lg p-4">
+                  <div class="flex justify-between items-start">
+                    <div>
+                      <a href={`/iam/roles/${role.id}`} class="font-medium text-primary hover:underline">
+                        {role.name}
+                      </a>
+                      {role.system && (
+                        <span class="ml-2 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">System Role</span>
+                      )}
+                      <div class="mt-2 grid grid-cols-3 gap-2 text-xs text-gray-600">
+                        {Object.entries(role.permissions).slice(0, 6).map(([service, perms]) => (
+                          <div>
+                            <span class="font-medium capitalize">{service}:</span> {Array.isArray(perms) ? perms.join(', ') : perms}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button class="px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Security Settings</h4>
+            <div class="border border-gray-200 rounded-lg p-4">
+              <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <p class="text-sm font-medium">Multi-Factor Authentication</p>
+                    <p class="text-xs text-gray-500 mt-1">Add extra security to your account</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class={`px-2 py-1 rounded text-xs font-medium ${user.mfa ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {user.mfa ? 'Enabled' : 'Disabled'}
+                    </span>
+                    <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                      {user.mfa ? 'Reset' : 'Enable'}
+                    </button>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <div>
+                    <p class="text-sm font-medium">Password</p>
+                    <p class="text-xs text-gray-500 mt-1">Last changed: 2025-09-01</p>
+                  </div>
+                  <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    Reset Password
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Tab -->
+      <div id="activity-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Recent Activity</h3>
+
+        <div class="space-y-2">
+          {activityLog.map(activity => (
+            <div class={`border-l-2 pl-4 py-2 ${activity.result === 'success' ? 'border-green-500' : 'border-red-500'}`}>
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="text-sm font-medium">{activity.action}</p>
+                  <p class="text-sm text-gray-600">{activity.resource}</p>
+                </div>
+                <span class={`px-2 py-1 rounded text-xs font-medium ${activity.result === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {activity.result}
+                </span>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">{activity.timestamp}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Access Keys Tab -->
+      <div id="access-keys-tab" class="tab-content hidden">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Access Keys</h3>
+          <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+            Generate New Key
+          </button>
+        </div>
+
+        {mockAccessKeys.length > 0 ? (
+          <div class="space-y-3">
+            {mockAccessKeys.map(key => (
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="font-medium">{key.name}</p>
+                    <p class="text-sm text-gray-500 mt-1">Key ID: {key.id}</p>
+                    <div class="flex gap-4 mt-2 text-xs text-gray-600">
+                      <span>Created: {key.created}</span>
+                      <span>Last used: {key.lastUsed}</span>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <button class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                      Rotate
+                    </button>
+                    <button class="px-3 py-1 border border-red-300 text-red-600 rounded text-sm hover:bg-red-50">
+                      Revoke
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="text-center py-8">
+            <p class="text-gray-500 mb-4">No access keys configured</p>
+            <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+              Generate First Access Key
+            </button>
+          </div>
+        )}
+
+        <div class="mt-6 p-4 bg-amber-50 border border-amber-200 rounded">
+          <p class="text-sm text-amber-800">
+            <strong>Security Note:</strong> Access keys provide programmatic access to the platform. Store them securely and rotate regularly.
+          </p>
+        </div>
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">User account created</p>
+            <p class="text-gray-500">System - 2025-01-15 10:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Role assigned: {assignedRoles[0]?.name}</p>
+            <p class="text-gray-500">admin@example.com - 2025-01-15 10:05:00</p>
+          </div>
+          {user.mfa && (
+            <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+              <p class="font-medium">MFA enabled</p>
+              <p class="text-gray-500">{user.email} - 2025-01-16 09:00:00</p>
+            </div>
+          )}
+          {user.status === 'suspended' && (
+            <div class="text-sm border-l-2 border-red-500 pl-4 py-2">
+              <p class="font-medium">User suspended</p>
+              <p class="text-gray-500">admin@example.com - 2025-10-15 14:30:00</p>
+            </div>
+          )}
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Last login</p>
+            <p class="text-gray-500">{user.email} - {user.lastLogin}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

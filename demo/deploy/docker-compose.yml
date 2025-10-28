@@ -1,0 +1,15 @@
+services:
+  autark-demo:
+    image: richloh/repo:autark-demo
+    networks:
+      - caddy
+    labels:
+      caddy: autark-demo.tmt-labs.de
+      caddy.reverse_proxy: "{{upstreams 4321}}"
+    environment:
+      - SITE_URL=https://autark-demo.tmt-labs.de
+    restart: always
+
+networks:
+  caddy:
+    external: true

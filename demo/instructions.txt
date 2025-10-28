@@ -1,0 +1,213 @@
+You are building a static, file-routed mock frontend for an open-source AWS-like platform called "Autark." Use Astro for pages/layouts and partial hydration. Use Tailwind CSS with JIT via a minimal build step. Keep client-side JavaScript small, componentized, and only where necessary.
+
+Stack and constraints
+
+- Framework: Astro for static site generation, file-based routing, and partial hydration.
+- Styling: Tailwind CSS with JIT (configured in the Astro build step). Keep customization minimal; stay close to Tailwind defaults.
+- JavaScript: Prefer Astro Islands (client:load/idle/visible) for interactive components; use small, framework-free ES modules where possible.
+- Data: Load a local JSON manifest (data.json) at build time and make it available to pages via Astro’s data pipeline. For client mutations, rehydrate and persist changes using localStorage. No backend.
+- No React/Preact/Vue unless absolutely necessary. If islands are required, prefer lightweight, framework-free web components or plain modules.
+- No external assets beyond Tailwind CDN for dev; production uses compiled Tailwind CSS from the build. No image or font CDNs unless provided by the user.
+- Output: A static site (dist) with Astro-generated HTML, compiled Tailwind CSS, and minimal client JS. Keep it responsive and mobile-friendly.
+
+High-level goals
+
+- Deliver a polished UI echoing AWS/GCP/Azure patterns: left navigation sidebar + top bar with account and project selectors.
+- Implement list views, create/edit wizards, detail pages, and preset configuration pages for all menu items.
+- Simulate provisioning flows with step-by-step status and progress.
+- Provide real-time pricing estimates on create/edit wizards using pricing in the manifest.
+- Add filtering, search, tagging, and bulk actions where relevant.
+- Ensure full responsiveness and accessibility.
+
+Routing
+
+Use Astro’s file-based routing to match exactly the following paths (organized into folders/files under src/pages). Use dynamic routes for :params:
+
+- /dashboard
+- /infrastructure/vms, /infrastructure/vms/presets, /infrastructure/vms/[id]
+- /infrastructure/volumes, /infrastructure/volumes/presets, /infrastructure/volumes/[id]
+- /infrastructure/networks, /infrastructure/networks/[id]
+- /infrastructure/ips
+- /infrastructure/firewalls, /infrastructure/firewalls/[id]
+- /infrastructure/dns, /infrastructure/dns/[zoneId]
+- /managed-services/db, /managed-services/db/presets, /managed-services/db/[id]
+- /managed-services/kubernetes, /managed-services/kubernetes/[id]
+- /managed-services/object-storage, /managed-services/object-storage/[bucketId]
+- /managed-services/load-balancers, /managed-services/load-balancers/[id]
+- /hardware/bare-metals, /hardware/bare-metals/[id]
+- /hardware/cloud-providers, /hardware/cloud-providers/[id]
+- /iam/users, /iam/users/[id]
+- /iam/roles, /iam/roles/[id]
+- /iam/system-accounts, /iam/system-accounts/[id]
+- /iam/project-allowances, /iam/project-allowances/[id]
+
+Data and state
+
+- At build time, import data.json and expose it to pages for initial rendering.
+- On the client, maintain a synced state layer that:
+  - Reads initial state from server-rendered HTML (injected JSON or data attributes) and merges with localStorage (key: autark.state).
+  - Persists user-created/edited items and UI preferences to localStorage.
+  - Respects accountId and projectId scoping across lists and details.
+- ID generation: For new items, use stable prefixes (e.g., vm-<uuid>, vol-<uuid>).
+- Some entities (hardware, providers, roles) may be global-scoped.
+
+Core layout
+
+- Use an Astro layout component for shared shell:
+  - Top bar:
+    - Logo/name "Autark"
+    - Account selector and Project selector (from JSON defaults and lists). Changing either triggers rerender/filtering within the current page.
+    - Global search input that filters the current list table when present.
+    - Notifications bell and user avatar (mock).
+  - Left navigation:
+    - Render from navigation tree in data.json. Support nested groups and highlight the current route.
+  - Content area:
+    - Breadcrumbs reflecting current route.
+    - Page title + description.
+    - Main content (tables, forms, charts, detail panes).
+- Keep hydration minimal: the shell renders server-side; only interactive elements hydrate.
+
+Common components and behaviors
+
+Build small, reusable Astro/JS components under src/components:
+
+- Tables:
+  - Columns with client-side sort toggles, pagination, row selection for bulk actions, status pills, tag chips.
+  - Search filters rows by name, id, tags, IPs, etc.
+  - Make tables horizontally scrollable on small screens; keep key columns sticky on mobile.
+- Forms:
+  - Support text, number with units, select, multi-select, tags, textarea (code editor), toggle, radio, slider, key/value editors, and list editors (e.g., node pools, firewall rules).
+  - Validate required fields, marking invalid inputs.
+  - Create/edit pages show a live cost estimator panel that recomputes using pricing.* from the manifest.
+- Modals:
+  - Confirm delete, force stop, rotate credentials, etc. Implement with lightweight JS and accessible markup.
+- Provisioning step runner:
+  - After create submit (VM, DB, Kubernetes, Bare Metal, etc.), show step-by-step progress with faux timing, statuses, and logs per provisioningSteps schema on the page.
+- Charts:
+  - Use simple canvas/SVG or DOM-based sparklines/area charts. Do not pull external chart libs.
+  - Source from pages.*.charts or data.*.metrics if available.
+- Toasters/notifications:
+  - Success/error toasts and rendering of data.notifications.
+
+Pricing and cost estimations
+
+Compute and display real-time costs using manifest pricing and app.currency:
+
+- VM monthly = vCPU*vCPUPerMonth + RAM_GB*ramGBPerMonth + systemDisk_GB*systemDiskGBPerMonth + sum(attached volumes using volume pricing) + public IPv4 count*publicIPv4PerMonth + GPUs*(gpuPerHour*24*30)
+- DB monthly = vCPU*vCPUPerMonth + RAM_GB*ramGBPerMonth + storage_GB*storageGBPerMonth + backup_GB*backupGBPerMonth; multiply by haMultiplier if HA
+- Kubernetes control plane monthly = controlPlaneSmallPerMonth + (HA ? controlPlaneHAAddOnPerMonth : 0); worker nodes billed like VMs
+- Object storage = storageGB*rate + requestsPerMillion*rate + egressGB*rate
+- Load balancer = hourly_rate*24*30 + dataProcessedGB*rate
+
+Pages and UX specifics
+
+- Dashboard:
+  - Cards for counts and cost estimates, simple charts (cost trend, capacity), recent activity/audit log, health summary. Respect account/project filters.
+- Infrastructure
+  - VMs:
+    - List: name, status, vCPUs/RAM, image, IPs, attached volumes count, firewall, tags, monthly cost.
+    - Create/Edit wizard: preset/custom sizing, provider/datacenter, GPU options, image, SSH key, networking (attach IPs), volumes, firewall rules, backups schedule, init-script. Live cost panel.
+    - After submit: provisioning step runner (connect to host, allocate on hypervisor, configure network, etc.).
+    - Detail: lifecycle actions (start/stop/reboot), stats (CPU, RAM, disk, net), backups (create/restore), volumes/IPs/firewalls tabs, audit log.
+    - Presets: local add/edit/delete UI.
+  - Volumes:
+    - List: name, type (ssd/nvme/hdd), size, IOPS/throughput, attached to, tags, snapshots count, monthly cost.
+    - Create/Edit: name, type, size, performance, attach to VM (optional), backups/snapshots schedule, tags. Live cost panel.
+    - Detail: performance charts, attachments, snapshots timeline, expand/shrink (mock), audit log.
+    - Presets: manage presets locally.
+  - Networks:
+    - List: name, CIDR, subnets count, NAT, attached resources, tags.
+    - Create/Edit: name, CIDR, provider/datacenter, subnets editor, NAT gateway toggle, DNS integration, tags.
+    - Detail: subnets, routes, attached IPs/VMs/DBs/LBs, audit log.
+  - IPs:
+    - List: pools, addresses, version (v4/v6), assigned to, tags, monthly cost.
+    - Allocate/Assign modals; release/unassign.
+  - Firewalls:
+    - List: name, default policy, rules count, attached to, tags.
+    - Create/Edit: rules editor (dir, proto, ports, source/dest CIDR, action, priority), attach to resources.
+    - Detail: effective rules, attached resources, audit log.
+  - DNS:
+    - List zones: name, records count, provider, monthly cost.
+    - Detail: records table (A, AAAA, CNAME, MX, TXT, SRV), add/edit record modals, zone settings.
+- Managed Services
+  - DB:
+    - List: engine/version, vCPU/RAM/storage, HA, endpoint, VPC/network, tags, monthly cost.
+    - Create/Edit: engine/version, preset/custom, storage, HA, backups, network/firewall, users, init SQL. Live cost panel.
+    - Detail: connection info, users, databases, metrics, backups, audit log.
+    - Presets: manage locally.
+  - Kubernetes:
+    - List: version, control plane HA, node pools, network, tags, monthly cost.
+    - Create/Edit: version, control plane size/HA, node pools, network/CNI, storage class, add-ons, RBAC, tags. Live cost.
+    - Detail: nodes table, workloads summary (mock), kubeconfig (mock text), add/remove node pools, metrics, audit log.
+  - Object Storage:
+    - List: buckets with region/provider, storage class, versioning, bytes used, tags, monthly cost.
+    - Create/Edit: name, region/provider, storage class, versioning, encryption, lifecycle rules, public access policy, tags. Live cost.
+    - Detail: overview, policies, lifecycle, access keys (mock), audit log.
+  - Load Balancers:
+    - List: type (L4/L7), listeners, target groups, IPs, status, tags, monthly cost.
+    - Create/Edit: type, listeners (port/proto/cert), target groups (targets + health checks), IP allocation, firewall, tags. Live cost.
+    - Detail: listener rules, targets health, metrics, audit log.
+- Hardware
+  - Bare metals:
+    - List: hostname, location, CPU/RAM/storage/GPU, hypervisor, status, tags.
+    - Add/Edit: inventory fields, mgmt IP, assign to pool/datacenter, provisioning steps; show step runner on add.
+    - Detail: hardware health, capacity used, hosted VMs, audit log.
+  - Cloud providers:
+    - List: provider name, regions, status, quotas, tags.
+    - Add/Edit: credentials (masked), regions allowed, quotas, connection test with step runner.
+    - Detail: quotas usage, resources discovered (mock), audit log.
+- IAM
+  - Users:
+    - List: name, email, roles, MFA, status, last login.
+    - Invite/Edit: email, display name, roles, account/project memberships, MFA toggle.
+    - Detail: activity, access keys (mock), audit log.
+  - Roles:
+    - List: name, system/custom, permissions count, assigned users count.
+    - Create/Edit: permission matrix (services x actions), scope (accounts/projects/tags).
+    - Detail: permissions, assignments, audit log.
+  - System accounts:
+    - List: name, token/keys (masked), scopes, last used.
+    - Create/Edit: scopes, tag conditions, IP allowlist, key rotation.
+    - Detail: tokens (mock), rotation history, audit log.
+  - Project allowances:
+    - List: project name, budgets, quotas per service.
+    - Edit: budgets, quotas, allowed services, region restrictions, tag policies.
+    - Detail: consumption vs quota charts, budget burn-down, audit log.
+
+Design guidelines
+
+- Tailwind theme: neutral grays, blue primary, green success, amber warning, red danger. Respect app.theme if present in data.
+- Status pills with consistent colors; tag badges.
+- Cards with subtle shadows, rounded corners, and generous whitespace.
+- Accessible focus styles and high contrast.
+- Simple icons (Unicode/Tailwind shapes) or locally inlined SVGs.
+- Mobile: tables scroll horizontally; keep essential columns sticky.
+
+Implementation notes
+
+- Directory structure (suggested):
+  - src/
+    - pages/… (Astro routes per spec)
+    - layouts/AutarkLayout.astro
+    - components/ (Table, Form controls, Modals, Charts, CostEstimator, Toaster, Breadcrumbs, Sidebar, Topbar)
+    - islands/ (interactive components hydrated as islands when needed)
+    - lib/ (pricing, filtering, sorting, pagination, uuid, state, validation)
+    - data/ (import data.json at build; also emit a serialized initialState script tag)
+  - public/ (favicons, manifest if needed)
+- State:
+  - Inject initial dataset into each page via Astro props and a window.__INITIAL_STATE__ script for client merging with localStorage.
+  - Use a small state module to handle get/set, scoping (accountId/projectId), and event dispatching for reactivity.
+- Build:
+  - Tailwind configured with Astro integration; JIT enabled.
+  - Minimal custom config; purge content targets src/**/*.astro and src/**/*.js.
+  - Output static site (astro build), deployable to any static host.
+
+What to deliver
+
+- A static Astro site with:
+  - File-based routes matching the spec.
+  - Compiled Tailwind CSS (JIT) and minimal client JS via Astro islands.
+  - ES module components under /components and /lib.
+  - data.json loaded at build, plus localStorage rehydration on the client.
+- No React/TypeScript required. Keep dependencies minimal and JavaScript small.
+- Fully responsive, accessible UI with the behaviors and pages described above.

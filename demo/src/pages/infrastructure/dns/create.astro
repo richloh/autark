@@ -1,0 +1,195 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const pricing = data.pricing;
+---
+
+<AutarkLayout
+  title="Create DNS Zone"
+  description="Create a new DNS zone and records."
+  currentPath="/infrastructure/dns"
+>
+  <div class="max-w-5xl mx-auto">
+    <div class="mb-6">
+      <a href="/infrastructure/dns" class="text-sm text-primary hover:underline mb-4 inline-block">
+        ← Back to DNS Zones
+      </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-6">Zone Configuration</h2>
+
+          <form id="zone-form" class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Domain Name</label>
+              <input type="text" name="domain" required pattern="^[a-z0-9.-]+\.[a-z]{2,}$" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="example.com" />
+              <p class="mt-1 text-xs text-gray-500">Fully qualified domain name (FQDN)</p>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">DNS Provider</label>
+              <select name="provider" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                <option value="internal">Internal (Autark)</option>
+                <option value="cloudflare">Cloudflare</option>
+                <option value="route53">AWS Route 53</option>
+                <option value="google-cloud-dns">Google Cloud DNS</option>
+              </select>
+            </div>
+
+            <div class="border-t border-gray-200 pt-6">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">DNS Records</h3>
+                  <p class="text-xs text-gray-500 mt-1">Add DNS records for your zone</p>
+                </div>
+                <button type="button" id="add-record" class="px-3 py-1 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+                  + Add Record
+                </button>
+              </div>
+
+              <div id="records-container" class="space-y-4">
+                <!-- Records will be added here dynamically -->
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+              <input type="text" name="tags" placeholder="env:prod, tier:dns" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              <p class="mt-1 text-xs text-gray-500">Comma-separated key:value pairs</p>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <a href="/infrastructure/dns" class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+                Cancel
+              </a>
+              <button type="submit" class="px-4 py-2 bg-success text-white rounded text-sm font-medium hover:bg-green-600">
+                Create Zone
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-lg shadow border border-gray-200 p-6 sticky top-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Cost Estimate</h3>
+
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600">Zone Cost:</span>
+              <span class="font-medium">€{pricing.dns.zonePerMonth}/mo</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Records:</span>
+              <span class="font-medium" id="record-count">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Records Cost:</span>
+              <span class="font-medium" id="records-cost">€0.00/mo</span>
+            </div>
+
+            <div class="pt-3 border-t border-gray-200">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-900 font-semibold">Monthly Total:</span>
+                <span class="text-2xl font-bold text-primary" id="cost-total">€{pricing.dns.zonePerMonth.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 p-3 bg-blue-50 rounded text-xs text-gray-600">
+            Prices include zone hosting and DNS queries. Data transfer charges may apply.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script define:vars={{ pricing }}>
+  (function() {
+    let recordCount = 0;
+
+    function addRecord() {
+      recordCount++;
+      const container = document.getElementById('records-container');
+      if (!container) return;
+
+      const recordHtml = `
+        <div class="border border-gray-200 rounded p-4 record-item" data-record-id="${recordCount}">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-medium text-gray-900">Record ${recordCount}</h4>
+            <button type="button" class="text-danger text-sm hover:underline remove-record" data-record-id="${recordCount}">Remove</button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+              <select name="record-${recordCount}-type" required class="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                <option value="A">A (IPv4 Address)</option>
+                <option value="AAAA">AAAA (IPv6 Address)</option>
+                <option value="CNAME">CNAME (Alias)</option>
+                <option value="MX">MX (Mail Exchange)</option>
+                <option value="TXT">TXT (Text)</option>
+                <option value="NS">NS (Name Server)</option>
+                <option value="SRV">SRV (Service)</option>
+                <option value="CAA">CAA (Certificate Authority)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
+              <input type="text" name="record-${recordCount}-name" required placeholder="@ or subdomain" class="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" />
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-medium text-gray-700 mb-1">Value</label>
+              <input type="text" name="record-${recordCount}-value" required placeholder="IP address, domain, or text" class="w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">TTL (seconds)</label>
+              <input type="number" name="record-${recordCount}-ttl" required min="60" max="86400" value="300" class="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+            </div>
+          </div>
+        </div>
+      `;
+
+      container.insertAdjacentHTML('beforeend', recordHtml);
+      updateCostEstimate();
+      attachRemoveListeners();
+    }
+
+    function attachRemoveListeners() {
+      document.querySelectorAll('.remove-record').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          const target = e.target as HTMLButtonElement;
+          const recordId = target.getAttribute('data-record-id');
+          const recordItem = document.querySelector(`.record-item[data-record-id="${recordId}"]`);
+          if (recordItem) {
+            recordItem.remove();
+            updateCostEstimate();
+          }
+        });
+      });
+    }
+
+    function updateCostEstimate() {
+      const recordsCount = document.querySelectorAll('.record-item').length;
+      const recordsCost = recordsCount * pricing.dns.recordPerMonth;
+      const totalCost = pricing.dns.zonePerMonth + recordsCost;
+
+      document.getElementById('record-count')!.textContent = recordsCount.toString();
+      document.getElementById('records-cost')!.textContent = `€${recordsCost.toFixed(2)}/mo`;
+      document.getElementById('cost-total')!.textContent = `€${totalCost.toFixed(2)}`;
+    }
+
+    document.getElementById('add-record')?.addEventListener('click', addRecord);
+
+    document.getElementById('zone-form')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      alert('DNS zone creation would start here!\\n\\nIn a real app, this would:\\n1. Validate domain and records\\n2. Create zone with DNS provider\\n3. Configure name servers\\n4. Redirect to zone detail page');
+    });
+
+    // Add first record by default
+    addRecord();
+  })();
+</script>

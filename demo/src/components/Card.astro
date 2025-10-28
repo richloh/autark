@@ -1,0 +1,15 @@
+---
+const { title, value, subtitle, icon } = Astro.props;
+---
+
+<div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+  <div class="flex items-center justify-between">
+    <div>
+      {title && <p class="text-sm font-medium text-gray-600">{title}</p>}
+      {value !== undefined && <p class="mt-2 text-3xl font-bold text-gray-900">{value}</p>}
+      {subtitle && <p class="mt-1 text-sm text-gray-500">{subtitle}</p>}
+    </div>
+    {icon && <div class="text-4xl">{icon}</div>}
+  </div>
+  <slot />
+</div>

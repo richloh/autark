@@ -1,0 +1,44 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const roles = data.data.roles || [];
+---
+
+<AutarkLayout
+  title="Roles"
+  description="Role-based access control."
+  currentPath="/iam/roles"
+>
+  <div class="mb-6 flex justify-end">
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Role
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">System</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permissions</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Users</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {roles.map(role => {
+          const permCount = role.permissions ? Object.keys(role.permissions).length : 0;
+          return (
+            <tr class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">{role.name}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{role.system ? '✓' : '—'}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{permCount} services</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">{role.assignedUsers?.length || 0}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

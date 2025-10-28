@@ -1,0 +1,100 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import data from '../../../data/data.json';
+
+const bareMetals = data.data.bareMetals || [];
+---
+
+<AutarkLayout
+  title="Bare Metal Hosts"
+  description="Self-hosted physical servers."
+  currentPath="/hardware/bare-metals"
+>
+  <div class="mb-6 flex items-center justify-between">
+    <input
+      type="search"
+      placeholder="Search servers..."
+      class="border border-gray-300 rounded px-4 py-2 text-sm w-64"
+    />
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Add Server
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hostname</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CPU</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">RAM</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Storage</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">GPUs</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hosted VMs</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {bareMetals.map(bm => {
+          const cpuUsagePercent = bm.usage && bm.cpuCores ? Math.round((bm.usage.cpuCores / bm.cpuCores) * 100) : 0;
+          const ramUsagePercent = bm.usage && bm.ramGB ? Math.round((bm.usage.ramGB / bm.ramGB) * 100) : 0;
+          const storageUsagePercent = bm.usage && bm.storageTB ? Math.round((bm.usage.storageTB / bm.storageTB) * 100) : 0;
+
+          return (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="text-sm font-medium text-primary">{bm.hostname}</div>
+              <div class="text-xs text-gray-500">{bm.mgmtIP}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{bm.locationId}</td>
+            <td class="px-6 py-4">
+              <div class="text-sm mb-1">{bm.cpu}</div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  class="bg-blue-600 h-2 rounded-full"
+                  style={`width: ${cpuUsagePercent}%`}
+                ></div>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                {bm.usage?.cpuCores || 0} / {bm.cpuCores} cores ({cpuUsagePercent}%)
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <div class="text-sm mb-1">{bm.ramGB} GB</div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  class="bg-green-600 h-2 rounded-full"
+                  style={`width: ${ramUsagePercent}%`}
+                ></div>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                {bm.usage?.ramGB || 0} / {bm.ramGB} GB ({ramUsagePercent}%)
+              </div>
+            </td>
+            <td class="px-6 py-4">
+              <div class="text-sm mb-1">{bm.storageTB} TB</div>
+              <div class="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  class="bg-purple-600 h-2 rounded-full"
+                  style={`width: ${storageUsagePercent}%`}
+                ></div>
+              </div>
+              <div class="text-xs text-gray-500 mt-1">
+                {bm.usage?.storageTB || 0} / {bm.storageTB} TB ({storageUsagePercent}%)
+              </div>
+            </td>
+            <td class="px-6 py-4 text-sm">
+              {bm.gpus.length > 0 ? bm.gpus.map(g => `${g.count}x ${g.model}`).join(', ') : '—'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <StatusBadge status={bm.status} />
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{bm.hostedVMs?.length || 0}</td>
+          </tr>
+        )})}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

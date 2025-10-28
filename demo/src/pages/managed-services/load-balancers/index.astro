@@ -1,0 +1,53 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import data from '../../../data/data.json';
+import { calculateLoadBalancerCost } from '../../../lib/pricing.js';
+
+const loadBalancers = data.data.loadBalancers || [];
+---
+
+<AutarkLayout
+  title="Load Balancers"
+  description="L4 and L7 load balancers."
+  currentPath="/managed-services/load-balancers"
+>
+  <div class="mb-6 flex justify-end">
+    <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+      Create Load Balancer
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Listeners</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target Groups</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">IPs</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {loadBalancers.map(lb => (
+          <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">{lb.name}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{lb.type}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{lb.listeners?.length || 0}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{lb.targetGroups?.length || 0}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">{lb.publicIPs?.length || 0}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <StatusBadge status={lb.status} />
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+              €{calculateLoadBalancerCost(lb, data.pricing)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</AutarkLayout>

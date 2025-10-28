@@ -1,0 +1,395 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import StatusBadge from '../../../components/StatusBadge.astro';
+import TagBadge from '../../../components/TagBadge.astro';
+import data from '../../../data/data.json';
+
+export function getStaticPaths() {
+  const bareMetals = data.data.bareMetals || [];
+  return bareMetals.map(bm => ({
+    params: { id: bm.id },
+    props: { bm }
+  }));
+}
+
+const { bm } = Astro.props;
+
+const location = data.hardwareProviders.selfHosted.find(l => l.id === bm.locationId);
+
+// Get hosted VMs
+const hostedVMs = bm.hostedVMs?.map(vmId => {
+  const vm = data.data.vms.find(v => v.id === vmId);
+  return vm;
+}).filter(Boolean) || [];
+
+// Calculate total storage
+const totalStorageGB = bm.storage.reduce((sum, s) => sum + s.sizeGB, 0);
+const totalStorageTB = (totalStorageGB / 1024).toFixed(1);
+
+// Mock capacity metrics
+const capacityMetrics = {
+  cpuUsed: 12,
+  cpuTotal: bm.cpu.includes('28') ? 28 : bm.cpu.includes('32') ? 32 : bm.cpu.includes('20') ? 20 : 16,
+  ramUsedGB: Math.floor(bm.ramGB * 0.4),
+  ramTotalGB: bm.ramGB,
+  storageUsedGB: Math.floor(totalStorageGB * 0.35),
+  storageTotalGB: totalStorageGB
+};
+
+// Mock health metrics
+const healthMetrics = {
+  cpuTemp: [52, 54, 53, 55, 54, 56, 55, 53, 54, 55],
+  powerWatts: [320, 340, 330, 350, 345, 355, 340, 335, 345, 350]
+};
+---
+
+<AutarkLayout
+  title={bm.hostname}
+  description={`Bare Metal Host ${bm.id}`}
+  currentPath={`/hardware/bare-metals/${bm.id}`}
+>
+  <!-- Action Bar -->
+  <div class="mb-6 flex items-center justify-between">
+    <a href="/hardware/bare-metals" class="text-sm text-primary hover:underline">
+      ← Back to Bare Metal Hosts
+    </a>
+    <div class="flex gap-2">
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Run Health Check
+      </button>
+      <button class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+        Drain Host
+      </button>
+      <button class="px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+        Edit
+      </button>
+      <button class="px-4 py-2 bg-danger text-white rounded text-sm font-medium hover:bg-red-600">
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <!-- Overview Cards -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Host Info</h3>
+      <div class="space-y-3">
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Status</span>
+          <StatusBadge status={bm.status} />
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Location</span>
+          <span class="text-sm font-medium">{location?.name || 'N/A'}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Hypervisor</span>
+          <span class="text-sm font-medium">{bm.hypervisor}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Mgmt IP</span>
+          <span class="text-sm font-mono font-medium">{bm.mgmtIP}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Hardware Specs</h3>
+      <div class="space-y-3">
+        <div>
+          <span class="text-sm text-gray-600">CPU</span>
+          <p class="text-sm font-medium mt-1">{bm.cpu}</p>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">RAM</span>
+          <span class="text-sm font-medium">{bm.ramGB} GB</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-sm text-gray-600">Storage</span>
+          <span class="text-sm font-medium">{totalStorageTB} TB</span>
+        </div>
+        {bm.gpus && bm.gpus.length > 0 && (
+          <div class="flex justify-between">
+            <span class="text-sm text-gray-600">GPUs</span>
+            <span class="text-sm font-medium">
+              {bm.gpus.map(g => `${g.count}x ${g.model}`).join(', ')}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow p-6 border border-gray-200">
+      <h3 class="text-sm font-medium text-gray-500 mb-3">Capacity Usage</h3>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-gray-600">CPU Cores</span>
+            <span class="font-medium">{capacityMetrics.cpuUsed}/{capacityMetrics.cpuTotal}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-primary rounded-full h-2" style={`width: ${(capacityMetrics.cpuUsed / capacityMetrics.cpuTotal) * 100}%`}></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-gray-600">RAM</span>
+            <span class="font-medium">{capacityMetrics.ramUsedGB}/{capacityMetrics.ramTotalGB} GB</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-accent rounded-full h-2" style={`width: ${(capacityMetrics.ramUsedGB / capacityMetrics.ramTotalGB) * 100}%`}></div>
+          </div>
+        </div>
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-gray-600">Storage</span>
+            <span class="font-medium">{capacityMetrics.storageUsedGB}/{capacityMetrics.storageTotalGB} GB</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-blue-500 rounded-full h-2" style={`width: ${(capacityMetrics.storageUsedGB / capacityMetrics.storageTotalGB) * 100}%`}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-lg shadow border border-gray-200">
+    <div class="border-b border-gray-200">
+      <nav class="flex space-x-8 px-6" aria-label="Tabs">
+        <button class="tab-button border-b-2 border-primary text-primary py-4 px-1 text-sm font-medium" data-tab="overview">
+          Overview
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="capacity">
+          Capacity
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="vms">
+          Hosted VMs ({hostedVMs.length})
+        </button>
+        <button class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 text-sm font-medium" data-tab="audit">
+          Audit Log
+        </button>
+      </nav>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="p-6">
+      <!-- Overview Tab -->
+      <div id="overview-tab" class="tab-content">
+        <h3 class="text-lg font-semibold mb-4">Hardware Details</h3>
+
+        <div class="space-y-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Storage Devices</h4>
+            <div class="space-y-2">
+              {bm.storage.map((storage, idx) => (
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                  <div>
+                    <span class="text-sm font-medium uppercase">{storage.type}</span>
+                    <span class="ml-2 text-sm text-gray-600">{storage.sizeGB} GB</span>
+                  </div>
+                  <span class="text-xs text-gray-500">Device {idx + 1}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {bm.gpus && bm.gpus.length > 0 && (
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 mb-3">GPU Devices</h4>
+              <div class="space-y-2">
+                {bm.gpus.map((gpu, idx) => (
+                  <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                    <div>
+                      <span class="text-sm font-medium">{gpu.model}</span>
+                      <span class="ml-2 text-sm text-gray-600">x{gpu.count}</span>
+                    </div>
+                    <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-medium">
+                      Available
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Location Details</h4>
+            <div class="p-4 bg-gray-50 rounded">
+              <p class="text-sm"><strong>Data Center:</strong> {location?.name || 'N/A'}</p>
+              <p class="text-sm text-gray-600 mt-1">{location?.location || ''}</p>
+            </div>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-3">Tags</h4>
+            <div class="flex flex-wrap gap-2">
+              {bm.tags && bm.tags.length > 0 ? (
+                bm.tags.map(tag => <TagBadge tag={tag} />)
+              ) : (
+                <p class="text-sm text-gray-500">No tags</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Capacity Tab -->
+      <div id="capacity-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Capacity & Health Metrics</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div class="border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-500 mb-2">CPU Utilization</p>
+            <div class="flex items-baseline">
+              <p class="text-3xl font-bold text-gray-900">
+                {Math.round((capacityMetrics.cpuUsed / capacityMetrics.cpuTotal) * 100)}%
+              </p>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              {capacityMetrics.cpuUsed} of {capacityMetrics.cpuTotal} cores allocated
+            </p>
+          </div>
+
+          <div class="border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-500 mb-2">RAM Utilization</p>
+            <div class="flex items-baseline">
+              <p class="text-3xl font-bold text-gray-900">
+                {Math.round((capacityMetrics.ramUsedGB / capacityMetrics.ramTotalGB) * 100)}%
+              </p>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              {capacityMetrics.ramUsedGB} of {capacityMetrics.ramTotalGB} GB allocated
+            </p>
+          </div>
+
+          <div class="border border-gray-200 rounded-lg p-4">
+            <p class="text-sm text-gray-500 mb-2">Storage Utilization</p>
+            <div class="flex items-baseline">
+              <p class="text-3xl font-bold text-gray-900">
+                {Math.round((capacityMetrics.storageUsedGB / capacityMetrics.storageTotalGB) * 100)}%
+              </p>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">
+              {capacityMetrics.storageUsedGB} of {capacityMetrics.storageTotalGB} GB used
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">CPU Temperature (°C)</h4>
+            <div class="h-48 flex items-end space-x-2">
+              {healthMetrics.cpuTemp.map(val => (
+                <div class="flex-1 bg-amber-500 rounded-t relative group" style={`height: ${(val / Math.max(...healthMetrics.cpuTemp)) * 100}%`} title={`${val}°C`}>
+                  <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">{val}</span>
+                </div>
+              ))}
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Average: {Math.round(healthMetrics.cpuTemp.reduce((a,b) => a+b, 0) / healthMetrics.cpuTemp.length)}°C</p>
+          </div>
+
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Power Consumption (W)</h4>
+            <div class="h-48 flex items-end space-x-2">
+              {healthMetrics.powerWatts.map(val => (
+                <div class="flex-1 bg-green-500 rounded-t relative group" style={`height: ${(val / Math.max(...healthMetrics.powerWatts)) * 100}%`} title={`${val}W`}>
+                  <span class="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-600 opacity-0 group-hover:opacity-100">{val}</span>
+                </div>
+              ))}
+            </div>
+            <p class="text-xs text-gray-500 mt-2 text-center">Average: {Math.round(healthMetrics.powerWatts.reduce((a,b) => a+b, 0) / healthMetrics.powerWatts.length)}W</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hosted VMs Tab -->
+      <div id="vms-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Hosted Virtual Machines</h3>
+
+        {hostedVMs.length > 0 ? (
+          <div class="space-y-3">
+            {hostedVMs.map(vm => (
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <a href={`/infrastructure/vms/${vm.id}`} class="text-sm font-medium text-primary hover:underline">
+                      {vm.name}
+                    </a>
+                    <p class="text-sm text-gray-500 mt-1">
+                      {vm.presetId ? data.presets.vm.find(p => p.id === vm.presetId)?.name : 'Custom'} •
+                      {vm.image.os} {vm.image.version}
+                    </p>
+                  </div>
+                  <StatusBadge status={vm.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div class="text-center py-8">
+            <p class="text-gray-500">No VMs currently hosted on this server</p>
+            <button class="mt-4 px-4 py-2 bg-primary text-white rounded text-sm font-medium hover:bg-blue-600">
+              Deploy VM
+            </button>
+          </div>
+        )}
+      </div>
+
+      <!-- Audit Tab -->
+      <div id="audit-tab" class="tab-content hidden">
+        <h3 class="text-lg font-semibold mb-4">Audit Log</h3>
+        <div class="space-y-2">
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Server registered</p>
+            <p class="text-gray-500">System - 2025-09-01 10:00:00</p>
+          </div>
+          <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+            <p class="font-medium">Hypervisor installed: {bm.hypervisor}</p>
+            <p class="text-gray-500">System - 2025-09-01 12:30:00</p>
+          </div>
+          {hostedVMs.length > 0 && (
+            <div class="text-sm border-l-2 border-green-500 pl-4 py-2">
+              <p class="font-medium">VM deployed: {hostedVMs[0].name}</p>
+              <p class="text-gray-500">admin@example.com - 2025-09-15 14:20:00</p>
+            </div>
+          )}
+          <div class="text-sm border-l-2 border-blue-500 pl-4 py-2">
+            <p class="font-medium">Health check completed</p>
+            <p class="text-gray-500">System - 2025-10-25 08:00:00</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script>
+  // Tab switching
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      const tabName = button.getAttribute('data-tab');
+
+      // Remove active state from all buttons
+      tabButtons.forEach(btn => {
+        btn.classList.remove('border-primary', 'text-primary');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+
+      // Add active state to clicked button
+      button.classList.remove('border-transparent', 'text-gray-500');
+      button.classList.add('border-primary', 'text-primary');
+
+      // Hide all tab contents
+      tabContents.forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      // Show selected tab content
+      document.getElementById(`${tabName}-tab`)?.classList.remove('hidden');
+    });
+  });
+</script>

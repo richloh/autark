@@ -1,0 +1,248 @@
+---
+import AutarkLayout from '../../../layouts/AutarkLayout.astro';
+import data from '../../../data/data.json';
+
+const presets = data.presets.volume || [];
+const vms = data.data.vms || [];
+const pricing = data.pricing;
+---
+
+<AutarkLayout
+  title="Create Volume"
+  description="Create a new block storage volume."
+  currentPath="/infrastructure/volumes"
+>
+  <div class="max-w-4xl mx-auto">
+    <div class="mb-6">
+      <a href="/infrastructure/volumes" class="text-sm text-primary hover:underline mb-4 inline-block">
+        ← Back to Volumes
+      </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-lg shadow border border-gray-200 p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-6">Volume Configuration</h2>
+
+          <form id="volume-form" class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Volume Name</label>
+              <input type="text" name="name" required class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" placeholder="e.g., app-data" />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Configuration Method</label>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="relative flex cursor-pointer rounded-lg border border-gray-300 bg-white p-4 hover:border-primary">
+                  <input type="radio" name="config-method" value="preset" checked class="sr-only" />
+                  <div class="flex flex-col">
+                    <span class="block text-sm font-medium text-gray-900">Use Preset</span>
+                    <span class="mt-1 text-xs text-gray-500">Select from predefined configs</span>
+                  </div>
+                </label>
+                <label class="relative flex cursor-pointer rounded-lg border border-gray-300 bg-white p-4 hover:border-primary">
+                  <input type="radio" name="config-method" value="custom" class="sr-only" />
+                  <div class="flex flex-col">
+                    <span class="block text-sm font-medium text-gray-900">Custom</span>
+                    <span class="mt-1 text-xs text-gray-500">Specify your own config</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div id="preset-config">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Select Preset</label>
+              <select name="preset-id" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                <option value="">-- Select a preset --</option>
+                {presets.map(p => (
+                  <option value={p.id} data-type={p.type} data-size={p.sizeGB} data-iops={p.iops} data-throughput={p.throughputMBps}>
+                    {p.name} - {p.type.toUpperCase()}, {p.sizeGB} GB, {p.iops} IOPS (€{p.monthlyPrice}/mo)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div id="custom-config" class="hidden space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Storage Type</label>
+                <select name="type" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <option value="ssd">SSD (€{pricing.volume.ssdGBPerMonth}/GB/month)</option>
+                  <option value="nvme">NVMe (€{pricing.volume.nvmeGBPerMonth}/GB/month)</option>
+                  <option value="hdd">HDD (€{pricing.volume.hddGBPerMonth}/GB/month)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Size (GB)</label>
+                <input type="number" name="size" min="1" value="100" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">IOPS</label>
+                <input type="number" name="iops" min="100" value="3000" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Throughput (MB/s)</label>
+                <input type="number" name="throughput" min="10" value="125" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Attach to VM (Optional)</label>
+              <select name="attach-to" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                <option value="">-- Leave unattached --</option>
+                {vms.map(vm => (
+                  <option value={vm.id}>{vm.name} ({vm.id})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label class="flex items-center">
+                <input type="checkbox" name="backups-enabled" class="rounded border-gray-300 text-primary focus:ring-primary" />
+                <span class="ml-2 text-sm text-gray-700">Enable automatic backups</span>
+              </label>
+            </div>
+
+            <div id="backup-options" class="hidden space-y-4 pl-6">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Backup Schedule</label>
+                <select name="backup-schedule" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent">
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Retention (copies)</label>
+                <input type="number" name="retention" min="1" max="30" value="7" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+              <input type="text" name="tags" placeholder="env:prod, tier:storage" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary focus:border-transparent" />
+              <p class="mt-1 text-xs text-gray-500">Comma-separated key:value pairs</p>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
+              <a href="/infrastructure/volumes" class="px-4 py-2 border border-gray-300 rounded text-sm font-medium hover:bg-gray-50">
+                Cancel
+              </a>
+              <button type="submit" class="px-4 py-2 bg-success text-white rounded text-sm font-medium hover:bg-green-600">
+                Create Volume
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="lg:col-span-1">
+        <div class="bg-white rounded-lg shadow border border-gray-200 p-6 sticky top-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">Cost Estimate</h3>
+
+          <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+              <span class="text-gray-600">Storage:</span>
+              <span class="font-medium" id="cost-storage">0 GB x €0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">IOPS:</span>
+              <span class="font-medium" id="cost-iops">0</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600">Throughput:</span>
+              <span class="font-medium" id="cost-throughput">0 MB/s</span>
+            </div>
+
+            <div class="pt-3 border-t border-gray-200">
+              <div class="flex justify-between items-center">
+                <span class="text-gray-900 font-semibold">Monthly Total:</span>
+                <span class="text-2xl font-bold text-primary" id="cost-total">€0.00</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 p-3 bg-blue-50 rounded text-xs text-gray-600">
+            Prices are estimates. Actual costs may vary based on usage.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</AutarkLayout>
+
+<script define:vars={{ pricing }}>
+  document.querySelectorAll('input[name="config-method"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      const presetConfig = document.getElementById('preset-config');
+      const customConfig = document.getElementById('custom-config');
+
+      if (target.value === 'preset') {
+        presetConfig?.classList.remove('hidden');
+        customConfig?.classList.add('hidden');
+      } else {
+        presetConfig?.classList.add('hidden');
+        customConfig?.classList.remove('hidden');
+      }
+      updateCostEstimate();
+    });
+  });
+
+  document.querySelector('input[name="backups-enabled"]')?.addEventListener('change', (e) => {
+    const target = e.target as HTMLInputElement;
+    const backupOptions = document.getElementById('backup-options');
+    if (target.checked) {
+      backupOptions?.classList.remove('hidden');
+    } else {
+      backupOptions?.classList.add('hidden');
+    }
+  });
+
+  function updateCostEstimate() {
+    const method = (document.querySelector('input[name="config-method"]:checked') as HTMLInputElement)?.value;
+    let type = 'ssd', size = 0, iops = 0, throughput = 0;
+
+    if (method === 'preset') {
+      const presetSelect = document.querySelector('select[name="preset-id"]') as HTMLSelectElement;
+      const selectedOption = presetSelect?.options[presetSelect.selectedIndex];
+      type = selectedOption?.getAttribute('data-type') || 'ssd';
+      size = parseInt(selectedOption?.getAttribute('data-size') || '0');
+      iops = parseInt(selectedOption?.getAttribute('data-iops') || '0');
+      throughput = parseInt(selectedOption?.getAttribute('data-throughput') || '0');
+    } else {
+      type = (document.querySelector('select[name="type"]') as HTMLSelectElement)?.value || 'ssd';
+      size = parseInt((document.querySelector('input[name="size"]') as HTMLInputElement)?.value || '0');
+      iops = parseInt((document.querySelector('input[name="iops"]') as HTMLInputElement)?.value || '0');
+      throughput = parseInt((document.querySelector('input[name="throughput"]') as HTMLInputElement)?.value || '0');
+    }
+
+    const pricePerGB = type === 'ssd' ? pricing.volume.ssdGBPerMonth :
+                       type === 'nvme' ? pricing.volume.nvmeGBPerMonth :
+                       pricing.volume.hddGBPerMonth;
+
+    const cost = size * pricePerGB;
+
+    document.getElementById('cost-storage')!.textContent = `${size} GB x €${pricePerGB}`;
+    document.getElementById('cost-iops')!.textContent = `${iops}`;
+    document.getElementById('cost-throughput')!.textContent = `${throughput} MB/s`;
+    document.getElementById('cost-total')!.textContent = `€${cost.toFixed(2)}`;
+  }
+
+  document.querySelector('select[name="preset-id"]')?.addEventListener('change', updateCostEstimate);
+  document.querySelector('select[name="type"]')?.addEventListener('change', updateCostEstimate);
+  document.querySelector('input[name="size"]')?.addEventListener('input', updateCostEstimate);
+  document.querySelector('input[name="iops"]')?.addEventListener('input', updateCostEstimate);
+  document.querySelector('input[name="throughput"]')?.addEventListener('input', updateCostEstimate);
+
+  document.getElementById('volume-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    alert('Volume creation would start here!\n\nIn a real app, this would:\n1. Validate inputs\n2. Save to localStorage\n3. Show provisioning steps\n4. Redirect to volume detail page');
+  });
+
+  updateCostEstimate();
+</script>
+
+<style>
+  input[type="radio"]:checked + div {
+    @apply border-primary ring-2 ring-primary;
+  }
+</style>
