@@ -58,9 +58,9 @@ export function TokenRevealModal({ open, onClose, secret, subject, kind, rotated
   const [ack, setAck] = useState(false);
   const masked = secret.secret.slice(0, 14) + '•'.repeat(24) + secret.secret.slice(-4);
   const examples = {
-    curl: `curl https://autark.example.com/api/v1/vms \\\n  -H "Authorization: Bearer ${secret.secret}"`,
-    terraform: `terraform {\n  required_providers {\n    autark = {\n      source  = "autark-io/autark"\n      version = "~> 1.4"\n    }\n  }\n}\n\nprovider "autark" {\n  endpoint = "https://autark.example.com"\n  # export AUTARK_TOKEN=... instead of committing the secret\n  token    = var.autark_token\n}`,
-    cli: `export AUTARK_TOKEN=${secret.secret}\nautark auth whoami\n# → ${kind === 'systemAccount' ? `svc:${subject}` : subject}\nautark vm list --project proj-app1`,
+    curl: `curl https://autark.regiocom-energie.de/api/v1/vms \\\n  -H "Authorization: Bearer ${secret.secret}"`,
+    terraform: `terraform {\n  required_providers {\n    autark = {\n      source  = "autark-io/autark"\n      version = "~> 1.4"\n    }\n  }\n}\n\nprovider "autark" {\n  endpoint = "https://autark.regiocom-energie.de"\n  # export AUTARK_TOKEN=... instead of committing the secret\n  token    = var.autark_token\n}`,
+    cli: `export AUTARK_TOKEN=${secret.secret}\nautark auth whoami\n# → ${kind === 'systemAccount' ? `svc:${subject}` : subject}\nautark vm list --project proj-compass`,
   };
   return (
     <Modal open={open} onClose={() => (ack ? onClose() : setAck(true))} size="lg" title={rotatedFrom ? `Token rotated — ${secret.token.name}` : `Token created — ${secret.token.name}`}

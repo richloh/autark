@@ -18,11 +18,11 @@ import type { K8sCluster, K8sClusterSummary, K8sWorkload, Tag } from '@/types';
 
 const TEMPLATES: Record<string, { label: string; name: string; image: string; replicas: number; cpu: number; mem: number; ports: string; kind: K8sWorkload['kind']; expose: K8sWorkload['expose']; gpu?: number; schedule?: string }> = {
   nginx: { label: 'nginx web', name: 'web', image: 'nginx:1.27-alpine', replicas: 3, cpu: 100, mem: 128, ports: '80', kind: 'Deployment', expose: 'ClusterIP' },
-  api: { label: 'Node.js API', name: 'api', image: 'registry.example.com/team/api:1.4.2', replicas: 4, cpu: 500, mem: 512, ports: '8080', kind: 'Deployment', expose: 'ClusterIP' },
+  api: { label: 'Node.js API', name: 'api', image: 'registry.regiocom-energie.de/team/api:1.4.2', replicas: 4, cpu: 500, mem: 512, ports: '8080', kind: 'Deployment', expose: 'ClusterIP' },
   redis: { label: 'Redis', name: 'redis', image: 'redis:7.4-alpine', replicas: 1, cpu: 250, mem: 1024, ports: '6379', kind: 'StatefulSet', expose: 'ClusterIP' },
-  worker: { label: 'Queue worker (big)', name: 'worker', image: 'registry.example.com/team/worker:2.0.1', replicas: 6, cpu: 1500, mem: 3072, ports: '', kind: 'Deployment', expose: 'none' },
+  worker: { label: 'Queue worker (big)', name: 'worker', image: 'registry.regiocom-energie.de/team/worker:2.0.1', replicas: 6, cpu: 1500, mem: 3072, ports: '', kind: 'Deployment', expose: 'none' },
   llm: { label: 'LLM inference (GPU)', name: 'llm', image: 'vllm/vllm-openai:v0.6.3', replicas: 1, cpu: 4000, mem: 24576, ports: '8000', kind: 'Deployment', expose: 'LoadBalancer', gpu: 1 },
-  cron: { label: 'Nightly job', name: 'nightly-report', image: 'registry.example.com/team/report:1.0.0', replicas: 1, cpu: 200, mem: 256, ports: '', kind: 'CronJob', expose: 'none', schedule: '0 2 * * *' },
+  cron: { label: 'Nightly job', name: 'nightly-report', image: 'registry.regiocom-energie.de/team/report:1.0.0', replicas: 1, cpu: 200, mem: 256, ports: '', kind: 'CronJob', expose: 'none', schedule: '0 2 * * *' },
 };
 
 interface SimResult { before: K8sClusterSummary; after: K8sClusterSummary; workloadPending: number; newlyPending: number; reasons: string[]; autoscale: { poolId: string; poolName: string; from: number; to: number } | null }

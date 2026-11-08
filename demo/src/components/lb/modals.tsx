@@ -60,7 +60,7 @@ export function RulesModal({ lb, listener, onClose }: { lb: LoadBalancer; listen
     { success: 'Routing rules updated', onSuccess: onClose, onError: (e) => setErrors(fieldErrors(e)) });
   const tgName = (id: string) => lb.targetGroups.find((t) => t.id === id)?.name ?? '?';
   return (
-    <Modal open={!!listener} onClose={onClose} size="lg" title={`Routing rules · ${listener?.protocol} :${listener?.port}`} description="First match wins. Host supports wildcards (*.example.com); path matches by prefix."
+    <Modal open={!!listener} onClose={onClose} size="lg" title={`Routing rules · ${listener?.protocol} :${listener?.port}`} description="First match wins. Host supports wildcards (*.regiocom-energie.de); path matches by prefix."
       footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" icon={Save} loading={save.isPending} onClick={() => save.mutate()}>Save rules</Button></>}>
       <RulesEditor rules={rules} onChange={setRules} targetGroups={lb.targetGroups} errors={errors} prefix={`listeners.${idx}.rules`} />
       {listener && <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">Anything else → default target group <b className="text-fg-2">{tgName(listener.defaultTargetGroupId)}</b></p>}

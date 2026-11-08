@@ -1,56 +1,105 @@
 import { db } from '../db';
 import { ApiError, newId, nowIso } from '../framework';
 import { parseCidr, intToIp, ipToInt } from '@/lib/cidr';
-import type { BareMetalHost, VM, IpAddress, IpPool, Firewall, Ref, ProjectAllowance, Tag, Volume, Location, Network } from '@/types';
+import { hostRoles, hostAllows, isRestricted, policyReason, ROLE_META, type PolicyNames, type WorkloadCtx } from '@/lib/hostPolicy';
+import type { BareMetalHost, VM, IpAddress, IpPool, Firewall, Ref, ProjectAllowance, Tag, Volume, Location, Network, HostRole, Account, Project } from '@/types';
 
 /* Cross-domain helpers shared by handlers. Keep relationships (which are stored on both sides for
  * convenient reads) consistent by always going through these functions. */
 
 /* ---------------------------------------------------------------- hosts / placement */
 
+/** Kind of a managed workload placed on a host (besides VMs). */
+export type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb';
+export interface ManagedItem { kind: ManagedKind; id: string; name: string; vcpus: number; ramGB: number; gpus: number; projectId?: string; role: HostRole }
+
+/** Lookup names for policy reasons ("Reserved for SAP IS/U"). */
+export const policyNames: PolicyNames = {
+  account: (id) => db.get<Account>('accounts', id)?.name ?? id,
+  project: (id) => db.get<Project>('projects', id)?.name ?? id,
+};
+
+/** Workload context for a project (account derived from the project). */
+export function workloadFor(projectId: string | null | undefined, role: HostRole = 'compute', accountId?: string | null): WorkloadCtx {
+  const p = projectId ? db.get<Project>('projects', projectId) : undefined;
+  return { role, projectId: projectId ?? null, accountId: accountId ?? p?.accountId ?? null };
+}
+
+const CP_SIZE: Record<string, { vcpus: number; ramGB: number }> = { small: { vcpus: 2, ramGB: 4 }, medium: { vcpus: 4, ramGB: 8 }, large: { vcpus: 8, ramGB: 16 } };
+export const LB_NODE = { count: 2, vcpus: 2, ramGB: 4 };
+
 /**
- * Managed workloads that also consume host capacity: database primaries/standbys (by primaryHostId)
- * and Kubernetes worker nodes, spread deterministically round-robin over ready hosts in the cluster's
- * location (GPU pools prefer GPU hosts).
+ * Managed workloads that also consume host capacity, placed deterministically on ready hosts whose
+ * policy allows them (role + access by the workload's project):
+ *  - database primaries/standbys (role compute; primaryHostId/standbyHostId when still eligible)
+ *  - Kubernetes worker nodes (role k8s-worker; GPU pools → GPU hosts)
+ *  - Kubernetes control planes (role k8s-control-plane; 1 replica, 3 when HA)
+ *  - load balancer nodes (role load-balancer; 2 per LB)
+ * Workloads with no eligible host are skipped. `override` lets callers simulate a policy change.
  */
-export function managedPlacements(): Map<string, { kind: 'db' | 'k8s'; id: string; name: string; vcpus: number; ramGB: number; gpus: number }[]> {
-  const out = new Map<string, { kind: 'db' | 'k8s'; id: string; name: string; vcpus: number; ramGB: number; gpus: number }[]>();
-  const add = (hostId: string, w: { kind: 'db' | 'k8s'; id: string; name: string; vcpus: number; ramGB: number; gpus: number }) => {
+export function managedPlacements(override?: Map<string, Pick<BareMetalHost, 'roles' | 'access'>>): Map<string, ManagedItem[]> {
+  const out = new Map<string, ManagedItem[]>();
+  const add = (hostId: string, w: ManagedItem) => {
     if (!out.has(hostId)) out.set(hostId, []);
     out.get(hostId)!.push(w);
   };
-  const ready = db.filter<BareMetalHost>('hosts', (h) => h.status === 'ready' && h.hypervisor === 'KVM').sort((a, b) => a.id.localeCompare(b.id));
+  const ready = db.filter<BareMetalHost>('hosts', (h) => h.status === 'ready' && h.hypervisor === 'KVM')
+    .map((h) => (override?.has(h.id) ? { ...h, ...override.get(h.id)! } : h))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const eligible = (loc: string, role: HostRole, r: { projectId?: string; accountId?: string }) => {
+    const wl = workloadFor(r.projectId, role, r.accountId);
+    return ready.filter((h) => h.locationId === loc && hostRoles(h).includes(role) && hostAllows(h, wl));
+  };
+  const spread = (list: BareMetalHost[], seed: string, n: number) => Array.from({ length: n }, (_, i) => list[(hashIdx(seed, list.length) + i) % list.length]);
+
   for (const d of db.list<any>('dbInstances')) {
     if (d.status === 'stopped' || d.status === 'deleting') continue;
-    const atLoc = ready.filter((h) => h.locationId === d.locationId && !h.gpus.length);
+    const all = eligible(d.locationId, 'compute', d);
+    const atLoc = all.filter((h) => !h.gpus.length).length ? all.filter((h) => !h.gpus.length) : all;
     if (!atLoc.length) continue;
     const primary = atLoc.find((h) => h.id === d.primaryHostId) ?? atLoc[hashIdx(d.id, atLoc.length)];
-    add(primary.id, { kind: 'db', id: d.id, name: `${d.name} (primary)`, vcpus: d.size.vcpus, ramGB: d.size.ramGB, gpus: 0 });
+    add(primary.id, { kind: 'db', id: d.id, name: `${d.name} (primary)`, vcpus: d.size.vcpus, ramGB: d.size.ramGB, gpus: 0, projectId: d.projectId, role: 'compute' });
     if (d.ha && atLoc.length > 1) {
-      const standby = atLoc[(atLoc.indexOf(primary) + 1) % atLoc.length];
-      add(standby.id, { kind: 'db', id: d.id, name: `${d.name} (standby)`, vcpus: d.size.vcpus, ramGB: d.size.ramGB, gpus: 0 });
+      const standby = atLoc.find((h) => h.id === d.standbyHostId && h.id !== primary.id) ?? atLoc[(atLoc.indexOf(primary) + 1) % atLoc.length];
+      add(standby.id, { kind: 'db', id: d.id, name: `${d.name} (standby)`, vcpus: d.size.vcpus, ramGB: d.size.ramGB, gpus: 0, projectId: d.projectId, role: 'compute' });
     }
   }
   for (const k of db.list<any>('k8sClusters')) {
     if (k.status === 'deleting') continue;
+    // control plane
+    const cpAll = eligible(k.locationId, 'k8s-control-plane', k);
+    const cpHosts = cpAll.filter((h) => !h.gpus.length).length ? cpAll.filter((h) => !h.gpus.length) : cpAll;
+    if (cpHosts.length) {
+      const size = CP_SIZE[k.controlPlane?.size] ?? CP_SIZE.small;
+      const replicas = k.controlPlane?.ha ? 3 : 1;
+      spread(cpHosts, `${k.id}-cp`, replicas).forEach((h, i) => add(h.id, { kind: 'k8s-cp', id: k.id, name: `${k.name}/control-plane-${i + 1}`, vcpus: size.vcpus, ramGB: size.ramGB, gpus: 0, projectId: k.projectId, role: 'k8s-control-plane' }));
+    }
+    // worker pools
+    const workers = eligible(k.locationId, 'k8s-worker', k);
     for (const p of k.nodePools ?? []) {
       const wantsGpu = !!p.gpu;
-      const atLoc = ready.filter((h) => h.locationId === k.locationId && (wantsGpu ? h.gpus.length > 0 : !h.gpus.length));
+      const atLoc = workers.filter((h) => (wantsGpu ? h.gpus.length > 0 : !h.gpus.length));
       if (!atLoc.length) continue;
-      for (let i = 0; i < p.count; i++) {
-        const h = atLoc[(hashIdx(k.id + p.id, atLoc.length) + i) % atLoc.length];
-        add(h.id, { kind: 'k8s', id: k.id, name: `${k.name}/${p.name}-${i + 1}`, vcpus: p.vcpus, ramGB: p.ramGB, gpus: p.gpu?.count ?? 0 });
-      }
+      spread(atLoc, k.id + p.id, p.count).forEach((h, i) => add(h.id, { kind: 'k8s', id: k.id, name: `${k.name}/${p.name}-${i + 1}`, vcpus: p.vcpus, ramGB: p.ramGB, gpus: p.gpu?.count ?? 0, projectId: k.projectId, role: 'k8s-worker' }));
     }
+  }
+  for (const lb of db.list<any>('loadBalancers')) {
+    if (lb.status === 'deleting') continue;
+    const loc = db.get<Location>('locations', lb.locationId);
+    if (!loc || loc.kind !== 'selfHosted') continue;
+    const all = eligible(lb.locationId, 'load-balancer', lb);
+    const atLoc = all.filter((h) => !h.gpus.length).length ? all.filter((h) => !h.gpus.length) : all;
+    if (!atLoc.length) continue;
+    spread(atLoc, lb.id, LB_NODE.count).forEach((h, i) => add(h.id, { kind: 'lb', id: lb.id, name: `${lb.name}/node-${i + 1}`, vcpus: LB_NODE.vcpus, ramGB: LB_NODE.ramGB, gpus: 0, projectId: lb.projectId, role: 'load-balancer' }));
   }
   return out;
 }
 
 function hashIdx(s: string, n: number) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h % n }
 
-export function hostAllocation(hostId: string) {
+export function hostAllocation(hostId: string, placements = managedPlacements()) {
   const vms = db.filter<VM>('vms', (v) => v.hostId === hostId && v.status !== 'deleting');
-  const managed = managedPlacements().get(hostId) ?? [];
+  const managed = placements.get(hostId) ?? [];
   return {
     vcpus: vms.reduce((a, v) => a + v.size.vcpus, 0) + managed.reduce((a, m) => a + m.vcpus, 0),
     ramGB: vms.reduce((a, v) => a + v.size.ramGB, 0) + managed.reduce((a, m) => a + m.ramGB, 0),
@@ -75,50 +124,71 @@ export interface HostCandidate {
   host: BareMetalHost;
   fits: boolean;
   reason: string | null; // why it does not fit
+  /** set when the host's policy (role or access) excludes the workload */
+  excluded: 'role' | 'access' | null;
+  /** restricted host that is reserved for this workload's account/project */
+  dedicated: boolean;
   cap: ReturnType<typeof hostCapacity>;
   used: { vcpus: number; ramGB: number; gpus: number; vms: number };
   score: number;
 }
 
+export type Need = { vcpus: number; ramGB: number; gpus: number; gpuModel?: string };
+const DEFAULT_WL: WorkloadCtx = { role: 'compute' };
+
 /**
  * Rank all hosts at a self-hosted location for a request (the scheduler's logic, also used for the
- * placement preview). Fitting hosts first; GPU hosts are kept free for GPU workloads; then most free RAM.
+ * placement preview). Hosts whose policy excludes the workload (wrong role, reserved for someone
+ * else) are never candidates. Among fitting hosts: dedicated (reserved for this project/account)
+ * first, GPU hosts kept free for GPU workloads, then most free RAM.
  */
-export function rankHosts(locationId: string, need: { vcpus: number; ramGB: number; gpus: number; gpuModel?: string }, excludeId?: string): HostCandidate[] {
+export function rankHosts(locationId: string, need: Need, excludeId?: string, wl: WorkloadCtx = DEFAULT_WL): HostCandidate[] {
+  const placements = managedPlacements();
   return db
-    .filter<BareMetalHost>('hosts', (h) => h.locationId === locationId && h.hypervisor === 'KVM' && h.id !== excludeId)
+    .filter<BareMetalHost>('hosts', (h) => h.locationId === locationId && h.id !== excludeId && h.status !== 'decommissioning')
     .map((h) => {
       const cap = hostCapacity(h);
-      const a = hostAllocation(h.id);
+      const a = hostAllocation(h.id, placements);
       const used = { vcpus: a.vcpus, ramGB: a.ramGB, gpus: a.gpus, vms: a.vms };
       const freeRam = cap.ramGB - used.ramGB;
       const freeCpu = cap.vcpus - used.vcpus;
       const gpuOk = need.gpus === 0 || (h.gpus.some((g) => !need.gpuModel || g.model === need.gpuModel) && cap.gpus - used.gpus >= need.gpus);
-      const reason = h.status !== 'ready' ? `Host is ${h.status}`
+      const policy = policyReason(h, wl, policyNames);
+      const excluded: HostCandidate['excluded'] = !policy ? null : policy.startsWith('Reserved') ? 'access' : 'role';
+      const reason = policy
+        ?? (h.status !== 'ready' ? `Host is ${h.status}`
         : freeRam < need.ramGB ? `Only ${Math.max(0, freeRam)} GB RAM free`
         : freeCpu < need.vcpus ? `Only ${Math.max(0, freeCpu)} vCPU free`
-        : !gpuOk ? (need.gpuModel ? `No free ${need.gpuModel} GPU` : 'No free GPU') : null;
+        : !gpuOk ? (need.gpuModel ? `No free ${need.gpuModel} GPU` : 'No free GPU') : null);
+      const dedicated = !policy && isRestricted(h);
       const gpuPenalty = need.gpus === 0 && cap.gpus > 0 ? 1 : 0;
-      return { host: h, fits: !reason, reason, cap, used, score: (reason ? -1e6 : 0) - gpuPenalty * 1e5 + freeRam };
+      return { host: h, fits: !reason, reason, excluded, dedicated, cap, used, score: (policy ? -2e6 : reason ? -1e6 : 0) + (dedicated ? 5e5 : 0) - gpuPenalty * 1e5 + freeRam };
     })
     .sort((x, y) => y.score - x.score);
 }
 
-/** Choose the best host at a self-hosted location that fits the request. */
-export function pickHost(locationId: string, need: { vcpus: number; ramGB: number; gpus: number; gpuModel?: string }, excludeId?: string): BareMetalHost {
-  const best = rankHosts(locationId, need, excludeId).find((c) => c.fits);
+/** Choose the best host at a self-hosted location that fits the request and whose policy allows the workload. */
+export function pickHost(locationId: string, need: Need, excludeId?: string, wl: WorkloadCtx = DEFAULT_WL): BareMetalHost {
+  const ranked = rankHosts(locationId, need, excludeId, wl);
+  const best = ranked.find((c) => c.fits);
   if (!best) {
-    throw new ApiError(409, `No host in ${locationId} has capacity for ${need.vcpus} vCPU / ${need.ramGB} GB${need.gpus ? ` / ${need.gpus}× GPU` : ''}. Add hardware or choose another location.`, 'insufficient_capacity');
+    const allowed = ranked.filter((c) => !c.excluded);
+    const what = `${need.vcpus} vCPU / ${need.ramGB} GB${need.gpus ? ` / ${need.gpus}× GPU` : ''}`;
+    if (ranked.length && !allowed.length) {
+      throw new ApiError(409, `No host in ${locationId} may run ${ROLE_META[wl.role].workload}${wl.projectId ? ` for ${policyNames.project(wl.projectId)}` : ''}: ${[...new Set(ranked.map((c) => c.reason))].slice(0, 3).join('; ')}. Adjust host policies under Bare metal hosts or choose another location.`, 'no_eligible_host');
+    }
+    throw new ApiError(409, `No eligible host in ${locationId} has capacity for ${what}${ranked.length > allowed.length ? ` (${ranked.length - allowed.length} host(s) excluded by policy)` : ''}. Add hardware or choose another location.`, 'insufficient_capacity');
   }
   return best.host;
 }
 
-/** Validate an explicitly chosen host for a request (manual placement override). */
-export function checkHostFits(hostId: string, locationId: string, need: { vcpus: number; ramGB: number; gpus: number; gpuModel?: string }): BareMetalHost {
+/** Validate an explicitly chosen host for a request (manual placement override), including its policy. */
+export function checkHostFits(hostId: string, locationId: string, need: Need, wl: WorkloadCtx = DEFAULT_WL): BareMetalHost {
   const host = db.get<BareMetalHost>('hosts', hostId);
   if (!host) throw new ApiError(422, 'Unknown host', 'validation_failed', { hostId: 'Unknown host' });
   if (host.locationId !== locationId) throw new ApiError(422, `${host.name} is in ${host.locationId}, not ${locationId}`, 'validation_failed', { hostId: 'Host is in another location' });
-  const c = rankHosts(locationId, need).find((x) => x.host.id === hostId);
+  const c = rankHosts(locationId, need, undefined, wl).find((x) => x.host.id === hostId);
+  if (c?.excluded) throw new ApiError(422, `${host.name} can't run this workload: ${c.reason}`, 'host_policy', { hostId: c.reason ?? 'Excluded by host policy' });
   if (!c?.fits) throw new ApiError(409, `${host.name} can't take this VM: ${c?.reason ?? 'not schedulable'}`, 'insufficient_capacity', { hostId: c?.reason ?? 'Not schedulable' });
   return host;
 }

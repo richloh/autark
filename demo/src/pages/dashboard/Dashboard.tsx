@@ -1,3 +1,4 @@
+import { FolderPlus } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import {
@@ -5,6 +6,7 @@ import {
   ShieldCheck, Gauge, Activity, Bell, PieChart, ArrowRight, Building2, Scale, UserPlus, KeyRound, Code2, Cloud, X, Waypoints,
 } from 'lucide-react';
 import { useGet, useList } from '@/api/hooks';
+import { NoProjectNotice } from '@/components/resource/pickers';
 import { useUi, usePro } from '@/store/ui';
 import { Page } from '@/components/ui/PageHeader';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
@@ -47,13 +49,15 @@ export default function Dashboard() {
   const { data: summary, isLoading: summaryLoading } = useCostSummary();
   const { data: history } = useCostHistory(30, 'service', 7);
   const { items: runningOps } = useList<Operation>('operations', { status: 'running' });
-  const { items: projects } = useList<Project>('projects');
+  const { items: projects, isSuccess: projectsLoaded } = useList<Project>('projects');
   const { items: accounts } = useList<Account>('accounts');
   const { data: me } = useGet<{ user: User }>(['users', 'me'], '/me');
   const [locationId, setLocationId] = useState<string | null>(null);
   const pro = usePro();
 
-  const issues = useMemo(() => collectIssues(fleet, summary), [fleet, summary]);
+  const proMode = usePro();
+  // hardware & provider issues are an operator concern → only in Pro mode
+  const issues = useMemo(() => collectIssues(fleet, summary).filter((i) => proMode || !i.link?.startsWith('/hardware')), [fleet, summary, proMode]);
   const account = accounts.find((a) => a.id === accountId);
   const accountProjects = projects.filter((p) => p.accountId === accountId);
   const project = projects.find((p) => p.id === projectId);
@@ -108,6 +112,7 @@ export default function Dashboard() {
       </div>
 
       <div className="space-y-4">
+        {projectsLoaded && !accountProjects.length && <Card><NoProjectNotice /></Card>}
         {(pro || issues.length > 0) && <HealthStrip issues={issues} fleet={fleet} compact={!pro} />}
         {pro && <GetStarted />}
 
@@ -226,9 +231,11 @@ function CreateSplitButton() {
         { label: 'Kubernetes cluster', icon: Boxes, to: '/managed-services/kubernetes/new' },
         { label: 'Bucket', icon: PackageOpen, to: '/managed-services/object-storage/new' },
         { label: 'Load balancer', icon: Scale, to: '/managed-services/load-balancers/new' },
-        { label: '', divider: true },
-        { label: 'Add bare-metal host', icon: Cpu, to: '/hardware/bare-metals/new' },
-        { label: 'Connect cloud provider', icon: Cloud, to: '/hardware/cloud-providers/new' },
+        ...(usePro() ? [
+          { label: '', divider: true },
+          { label: 'Add bare-metal host', icon: Cpu, to: '/hardware/bare-metals/new' },
+          { label: 'Connect cloud provider', icon: Cloud, to: '/hardware/cloud-providers/new' },
+        ] : []),
       ]} trigger={(open) => (
         <button type="button" aria-label="More create options" aria-haspopup="menu" aria-expanded={open}
           className={cn('inline-flex h-8 items-center rounded-r-lg border-l border-white/25 bg-brand-500 px-2 text-white transition-colors hover:bg-brand-600', open && 'bg-brand-600')}>
@@ -245,13 +252,15 @@ const GET_STARTED = [
   { icon: UserPlus, title: 'Invite member', desc: 'Give your team access', to: '/iam/users?invite=1', color: '#5b67f8' },
   { icon: KeyRound, title: 'Add SSH key', desc: 'For password-less VM login', to: '/infrastructure/ssh-keys', color: '#10b981' },
   { icon: Code2, title: 'API & IaC docs', desc: 'Terraform, CLI, REST', to: '/developer', color: '#a855f7' },
-  { icon: Cloud, title: 'Connect cloud provider', desc: 'Burst into Hetzner, OVH, AWS…', to: '/hardware/cloud-providers/new', color: '#0ea5e9' },
+  { icon: Cloud, title: 'Connect cloud provider', desc: 'Burst into Hetzner, OVH, AWS…', to: '/hardware/cloud-providers/new', color: '#0ea5e9', pro: true },
+  { icon: FolderPlus, title: 'Create a project', desc: 'Own budget, quotas & access', to: '/iam/project-allowances?new=1', color: '#f59e0b', simple: true },
 ];
 const GS_KEY = 'autark.dashboard.getStarted.hidden';
 
 /** Compact "Get started" link list shown next to Activity in simple mode. */
 function GetStartedList() {
-  const items = GET_STARTED.filter((g) => g.to !== '/developer');
+  const pro = usePro();
+  const items = GET_STARTED.filter((g) => g.to !== '/developer' && (pro ? !('simple' in g) : !('pro' in g)));
   return (
     <Card className="min-w-0 self-start">
       <CardHeader title="Get started" />
@@ -282,7 +291,7 @@ function GetStarted({ simple }: { simple?: boolean }) {
         <button type="button" onClick={hide} aria-label="Hide get started" title="Hide" className="rounded p-0.5 text-faint hover:bg-surface-2 hover:text-fg"><X className="size-3.5" /></button>
       </div>
       <div className="grid grid-cols-1 gap-2 @min-[30rem]:grid-cols-2 @min-[60rem]:grid-cols-4">
-        {GET_STARTED.map((g) => (
+        {GET_STARTED.filter((g) => !('simple' in g)).map((g) => (
           <Link key={g.title} to={g.to} className="group flex min-w-0 items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 shadow-card transition-colors hover:border-line-strong hover:bg-surface-2/50">
             <span className="flex size-8 shrink-0 items-center justify-center rounded-lg" style={{ background: `${g.color}1a`, color: g.color }}><g.icon className="size-4" /></span>
             <span className="min-w-0 flex-1">

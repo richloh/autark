@@ -1,19 +1,56 @@
-import { useEffect, useMemo } from 'react';
-import { Building2, Cloud } from 'lucide-react';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { Link } from 'react-router';
+import { Building2, Cloud, FolderPlus, Plus } from 'lucide-react';
 import { useList } from '@/api/hooks';
 import { useUi } from '@/store/ui';
 import { Field, Select, OptionCards } from '../ui/form';
-import type { Project, Location, Network, Firewall } from '@/types';
+import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/misc';
+import type { Account, Project, Location, Network, Firewall } from '@/types';
+
+export const NEW_PROJECT_LINK = '/iam/project-allowances?new=1';
+
+/** Projects of the current account (+ whether the list has loaded, so "none" is not confused with "loading"). */
+export function useAccountProjects() {
+  const accountId = useUi((s) => s.accountId);
+  const { items, isSuccess } = useList<Project>('projects');
+  const projects = useMemo(() => items.filter((p) => p.accountId === accountId), [items, accountId]);
+  return { projects, loaded: isSuccess, accountId };
+}
+
+/** Friendly explanation + call to action when the current account has no projects yet. */
+export function NoProjectNotice({ what = 'resource', className }: { what?: string; className?: string }) {
+  const accountId = useUi((s) => s.accountId);
+  const { items: accounts } = useList<Account>('accounts');
+  const name = accounts.find((a) => a.id === accountId)?.name ?? 'This account';
+  return (
+    <EmptyState icon={FolderPlus} className={className} title="Create your first project"
+      description={<>Every {what} lives in a project — budgets, quotas and access are managed per project. <span className="font-medium text-fg-2">{name}</span> has no projects yet.</>}
+      action={<Button variant="primary" icon={Plus} to={NEW_PROJECT_LINK}>Create project</Button>} />
+  );
+}
+
+/** Renders children only when the current account has at least one project; otherwise explains why and links to project creation. */
+export function RequireProject({ what, children }: { what?: string; children: ReactNode }) {
+  const { projects, loaded } = useAccountProjects();
+  if (loaded && projects.length === 0) return <div className="rounded-xl border border-line bg-surface shadow-card"><NoProjectNotice what={what} /></div>;
+  return <>{children}</>;
+}
 
 /** Project selector for create forms. Defaults to the currently scoped project. */
 export function ProjectField({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
-  const accountId = useUi((s) => s.accountId);
   const scoped = useUi((s) => s.projectId);
-  const { items } = useList<Project>('projects');
-  const projects = items.filter((p) => p.accountId === accountId);
+  const { projects, loaded } = useAccountProjects();
   useEffect(() => {
     if (!value && projects.length) onChange(scoped || projects[0].id);
   }, [value, projects.length, scoped]); // eslint-disable-line
+  if (loaded && !projects.length) {
+    return (
+      <Field label="Project" required error={error} hint={<>This account has no projects yet. <Link to={NEW_PROJECT_LINK} className="font-medium text-brand-600 hover:underline dark:text-brand-300">Create a project</Link> first.</>}>
+        <Select value="" onChange={() => {}} options={[]} placeholder="No projects in this account" />
+      </Field>
+    );
+  }
   return (
     <Field label="Project" required error={error}>
       <Select value={value} onChange={(e) => onChange(e.target.value)} options={projects.map((p) => ({ value: p.id, label: p.name }))} />

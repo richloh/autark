@@ -30,7 +30,7 @@ export const useUi = create<UiState>()(
     (set) => ({
       theme: 'system',
       sidebarCollapsed: false,
-      accountId: 'acc-myco-a',
+      accountId: 'acc-regiocom',
       projectId: '',
       inspectorOpen: false,
       recent: [],

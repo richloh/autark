@@ -103,9 +103,9 @@ export default function SystemAccountDetail() {
               <CardHeader title="Use from automation" description="Store the token as a CI secret named AUTARK_TOKEN." />
               <CardBody>
                 <IacTabs title="" snippets={{
-                  terraform: `provider "autark" {\n  endpoint = "https://autark.example.com"\n  token    = var.autark_token # ${s.name}\n}\n\n# Resources must carry these tags for ${s.name} to manage them:\n${s.tagConditions.map((t) => `#   ${t.key} = "${t.value}"`).join('\n') || '#   (no tag conditions)'}`,
-                  curl: `curl https://autark.example.com/api/v1/vms \\\n  -H "Authorization: Bearer $AUTARK_TOKEN"`,
-                  yaml: `# .gitlab-ci.yml\ndeploy:\n  image: ghcr.io/autark-io/cli:1.8\n  variables:\n    AUTARK_ENDPOINT: https://autark.example.com\n  script:\n    - autark auth whoami   # svc:${s.name}\n    - autark k8s kubeconfig app1-cluster > kubeconfig\n    - kubectl --kubeconfig kubeconfig apply -f k8s/`,
+                  terraform: `provider "autark" {\n  endpoint = "https://autark.regiocom-energie.de"\n  token    = var.autark_token # ${s.name}\n}\n\n# Resources must carry these tags for ${s.name} to manage them:\n${s.tagConditions.map((t) => `#   ${t.key} = "${t.value}"`).join('\n') || '#   (no tag conditions)'}`,
+                  curl: `curl https://autark.regiocom-energie.de/api/v1/vms \\\n  -H "Authorization: Bearer $AUTARK_TOKEN"`,
+                  yaml: `# .gitlab-ci.yml\ndeploy:\n  image: ghcr.io/autark-io/cli:1.8\n  variables:\n    AUTARK_ENDPOINT: https://autark.regiocom-energie.de\n  script:\n    - autark auth whoami   # svc:${s.name}\n    - autark k8s kubeconfig orchestrator-prod > kubeconfig\n    - kubectl --kubeconfig kubeconfig apply -f k8s/`,
                 }} />
               </CardBody>
             </Card>

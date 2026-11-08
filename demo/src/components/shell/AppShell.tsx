@@ -6,6 +6,7 @@ import { CommandPalette } from './CommandPalette';
 import { OperationsTray } from './Panels';
 import { ApiInspector } from './ApiInspector';
 import { AiPane } from '../ai/AiPane';
+import { Splash } from './Splash';
 import { useRealtimeInvalidation } from '@/api/hooks';
 import { useUi, applyTheme } from '@/store/ui';
 import { ConfirmHost } from '../ui/Modal';
@@ -40,6 +41,7 @@ export function AppShell() {
       <ApiInspector />
       <ConfirmHost />
       <Toaster />
+      <Splash />
     </div>
   );
 }

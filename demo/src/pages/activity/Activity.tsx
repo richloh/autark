@@ -154,7 +154,7 @@ function OperationsTab({ ops, loading }: { ops: Operation[]; loading: boolean })
             ]} />
             <div>
               <div className="mb-2 text-xs font-medium text-muted">API</div>
-              <CodeBlock language="bash" code={`curl -H "Authorization: Bearer $AUTARK_TOKEN" \\\n  https://autark.example.com/api/v1/operations/${open.id}${isRunning(open) ? `\n\n# cancel\ncurl -X POST -H "Authorization: Bearer $AUTARK_TOKEN" \\\n  https://autark.example.com/api/v1/operations/${open.id}/actions/cancel` : ''}`} />
+              <CodeBlock language="bash" code={`curl -H "Authorization: Bearer $AUTARK_TOKEN" \\\n  https://autark.regiocom-energie.de/api/v1/operations/${open.id}${isRunning(open) ? `\n\n# cancel\ncurl -X POST -H "Authorization: Bearer $AUTARK_TOKEN" \\\n  https://autark.regiocom-energie.de/api/v1/operations/${open.id}/actions/cancel` : ''}`} />
             </div>
           </div>
         )}

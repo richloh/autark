@@ -1,4 +1,4 @@
-import { Search, Menu as MenuIcon, Moon, Sun, Monitor, Terminal, LogOut, Settings, RotateCcw, User, BookOpen, Plus, ChevronDown, Sparkles, Sparkle } from 'lucide-react';
+import { Search, Menu as MenuIcon, Moon, Sun, Monitor, Terminal, LogOut, Settings, RotateCcw, User, BookOpen, Plus, ChevronDown, Sparkles, Sparkle, Info } from 'lucide-react';
 import { KINDS } from '@/lib/kinds';
 import type { ResourceKind } from '@/types';
 import { useNavigate } from 'react-router';
@@ -12,6 +12,7 @@ import { toast } from '../ui/toast';
 import { ScopeSwitcher } from './ScopeSwitcher';
 import { NotificationsButton } from './Panels';
 import { usePalette } from './CommandPalette';
+import { showSplash } from './Splash';
 import type { User as UserT } from '@/types';
 
 const CREATE_ITEMS: [string, string, ResourceKind, string?][] = [
@@ -52,7 +53,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
               <Plus className="size-4" /> Create <ChevronDown className="size-3.5 opacity-80" />
             </button>
           )}
-          items={CREATE_ITEMS.map(([label, to, kind, hint]) => ({ label, to, icon: KINDS[kind].icon, hint }))}
+          items={CREATE_ITEMS.filter(([, , kind]) => pro || kind !== 'bareMetal').map(([label, to, kind, hint]) => ({ label, to, icon: KINDS[kind].icon, hint }))}
         />
         <button onClick={() => openPalette(true)} className="flex size-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 xl:hidden" aria-label="Search"><Search className="size-[18px]" /></button>
         {pro && <button onClick={() => setInspector(true)} className="hidden size-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg sm:flex" title="API inspector" aria-label="API inspector"><Terminal className="size-[18px]" /></button>}
@@ -74,6 +75,7 @@ export function Topbar({ onMenu }: { onMenu: () => void }) {
             { label: 'Settings', icon: Settings, to: '/settings' },
             { label: pro ? 'Switch to simple mode' : 'Enable Pro mode', icon: Sparkle, onClick: () => { setPro(!pro); toast.info(pro ? 'Simple mode' : 'Pro mode enabled', pro ? 'Advanced pages and details are hidden.' : 'Topology, activity, IAM roles, metrics, IaC and advanced settings are now visible.') } },
             { label: `Theme: ${theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light'}`, icon: ThemeIcon, onClick: () => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light'), hint: 'cycle' },
+            { label: 'About this demo', icon: Info, onClick: showSplash },
             { divider: true, label: '' },
             {
               label: 'Reset demo data', icon: RotateCcw, onClick: async () => {

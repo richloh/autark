@@ -2,7 +2,8 @@ import { db } from '../db';
 import { defineCollection, route, ApiError, validate, nameError, uniqueNameError, scopeFor, newId, nowIso, getOr404, detachEverywhere, audit, DAY, MIN, type Ctx } from '../framework';
 import { startOperation, onOperationComplete, transition, type StepSpec } from '../operations';
 import { registerMetrics } from '../metrics';
-import { locationOrThrow, checkQuota, checkRequiredTags, checkLocationAllowed, setFirewalls, nextPrivateIp, allowanceFor, pickHost } from './shared';
+import { locationOrThrow, checkQuota, checkRequiredTags, checkLocationAllowed, setFirewalls, nextPrivateIp, allowanceFor, pickHost, workloadFor } from './shared';
+import { hostAllows } from '@/lib/hostPolicy';
 import { dbMonthly } from './costs';
 import { dbCost } from '@/lib/pricing';
 import type { DbInstance, DbPreset, DbBackup, DbEngine, DbEngineSpec, DbParamSpec, DbUser, Network, Firewall, Location, BareMetalHost, DnsZone } from '@/types';
@@ -142,11 +143,12 @@ function resolveSize(body: any, engine: DbEngine): { presetId: string | null; vc
   return { presetId: null, vcpus, ramGB };
 }
 
-function primaryHostFor(locationId: string, vcpus: number, ramGB: number, exclude?: string | null): BareMetalHost | null {
+function primaryHostFor(locationId: string, vcpus: number, ramGB: number, exclude?: string | null, projectId?: string | null): BareMetalHost | null {
   const loc = db.get<Location>('locations', locationId);
   if (loc?.kind !== 'selfHosted') return null;
-  try { return pickHost(locationId, { vcpus, ramGB, gpus: 0 }, exclude ?? undefined) }
-  catch { return db.find<BareMetalHost>('hosts', (h) => h.locationId === locationId && h.status === 'ready' && h.id !== exclude) ?? null }
+  const wl = workloadFor(projectId ?? null, 'compute');
+  try { return pickHost(locationId, { vcpus, ramGB, gpus: 0 }, exclude ?? undefined, wl) }
+  catch { return db.find<BareMetalHost>('hosts', (h) => h.locationId === locationId && h.status === 'ready' && h.id !== exclude && hostAllows(h, wl)) ?? null }
 }
 
 function hostName(id?: string | null) { return id ? db.get<BareMetalHost>('hosts', id)?.name ?? id : 'provider node' }
@@ -310,8 +312,8 @@ export function createDb(ctx: Ctx, body: any): DbInstance {
   checkRequiredTags(sc.projectId, body.tags);
   checkQuota(sc.projectId, { dbInstances: 1 });
 
-  const primary = primaryHostFor(loc.id, size.vcpus, size.ramGB);
-  const standby = body.ha ? primaryHostFor(loc.id, size.vcpus, size.ramGB, primary?.id) : null;
+  const primary = primaryHostFor(loc.id, size.vcpus, size.ramGB, null, sc.projectId);
+  const standby = body.ha ? primaryHostFor(loc.id, size.vcpus, size.ramGB, primary?.id, sc.projectId) : null;
   const now = nowIso();
   const users: DbUser[] = [{ username: spec.adminUser, role: 'owner', createdAt: now }];
   if (body.initialUser) users.push({ username: body.initialUser, role: 'owner', createdAt: now });
@@ -501,7 +503,7 @@ export function registerDatabases() {
         const sizeChanged = size.vcpus !== d.size.vcpus || size.ramGB !== d.size.ramGB;
         if (!sizeChanged && storageGB === d.storageGB && ha === d.ha && readReplicas === d.readReplicas) throw new ApiError(422, 'Nothing to change', 'validation_failed');
         if (d.status === 'stopped' && (ha !== d.ha || readReplicas !== d.readReplicas)) throw new ApiError(409, 'Start the database before changing HA or replicas', 'invalid_state');
-        const standby = ha && !d.ha ? primaryHostFor(d.locationId, size.vcpus, size.ramGB, d.primaryHostId) : null;
+        const standby = ha && !d.ha ? primaryHostFor(d.locationId, size.vcpus, size.ramGB, d.primaryHostId, d.projectId) : null;
         const steps: StepSpec[] = [];
         if (storageGB > d.storageGB) steps.push({ name: `Grow storage ${d.storageGB} → ${storageGB} GB (online)`, ms: ms(1.2), logs: ['rbd resize', 'xfs_growfs: online, no downtime'] });
         if (sizeChanged) {

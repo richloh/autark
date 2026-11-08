@@ -87,7 +87,7 @@ export function CreateImageModal({ open, onClose, initialSnapshotId }: { open: b
           )}
           {source === 'url' && (
             <Field label="Image URL" required error={errors.url} hint=".qcow2, .img, .raw, .vmdk or .iso over HTTP(S)">
-              <Input mono value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://cloud-images.example.org/noble.qcow2" invalid={!!errors.url} />
+              <Input mono value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img" invalid={!!errors.url} />
             </Field>
           )}
         </div>

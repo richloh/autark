@@ -27,7 +27,7 @@ export const TYPE_COLOR: Record<DnsRecordType, string> = {
 };
 const TTLS = [{ value: '60', label: '1 min' }, { value: '300', label: '5 min' }, { value: '3600', label: '1 hour' }, { value: '86400', label: '1 day' }];
 const TXT_TEMPLATES: { label: string; value: (z: string) => string; name?: string }[] = [
-  { label: 'SPF', value: () => 'v=spf1 mx include:_spf.example.com ~all' },
+  { label: 'SPF', value: () => 'v=spf1 mx -all' },
   { label: 'DMARC', value: (z) => `v=DMARC1; p=quarantine; rua=mailto:dmarc@${z}`, name: '_dmarc' },
   { label: 'Verification', value: () => 'site-verification=REPLACE_ME' },
 ];
@@ -144,18 +144,18 @@ export function DnsRecordModal({ open, onClose, zone, record, ipSuggestions = []
         )}
         {(d.type === 'CNAME' || d.type === 'NS' || d.type === 'PTR') && (
           <Field label="Target hostname" error={errors.value} hint="A trailing dot is added for fully-qualified names.">
-            <Input mono value={d.value} onChange={(e) => set({ value: e.target.value.trim() })} placeholder={d.type === 'NS' ? 'ns1.provider.net' : 'target.example.com'} />
+            <Input mono value={d.value} onChange={(e) => set({ value: e.target.value.trim() })} placeholder={d.type === 'NS' ? 'ns1.provider.net' : 'target.regiocom-energie.de'} />
           </Field>
         )}
         {d.type === 'MX' && (
           <div className="grid gap-3 @min-[36rem]:grid-cols-[110px_1fr]">
             <Field label="Priority" error={errors.priority}><Input mono value={d.priority} onChange={(e) => set({ priority: e.target.value.replace(/\D/g, '') })} /></Field>
-            <Field label="Mail server" error={errors.value}><Input mono value={d.value} onChange={(e) => set({ value: e.target.value.trim() })} placeholder="mail.example.com" /></Field>
+            <Field label="Mail server" error={errors.value}><Input mono value={d.value} onChange={(e) => set({ value: e.target.value.trim() })} placeholder="mail.regiocom-energie.de" /></Field>
           </div>
         )}
         {d.type === 'TXT' && (
           <Field label="Text" error={errors.value} action={<div className="flex gap-1">{TXT_TEMPLATES.map((t) => <Button key={t.label} size="xs" variant="ghost" onClick={() => set({ value: t.value(zone.name), ...(t.name && !d.name ? { name: t.name } : {}) })}>{t.label}</Button>)}</div>}>
-            <Textarea mono rows={3} value={d.value} onChange={(e) => set({ value: e.target.value })} placeholder="v=spf1 include:_spf.example.com ~all" />
+            <Textarea mono rows={3} value={d.value} onChange={(e) => set({ value: e.target.value })} placeholder="v=spf1 mx ip4:198.51.100.25 -all" />
           </Field>
         )}
         {d.type === 'SRV' && (
@@ -163,7 +163,7 @@ export function DnsRecordModal({ open, onClose, zone, record, ipSuggestions = []
             <Field label="Priority" error={errors.priority}><Input mono value={d.priority} onChange={(e) => set({ priority: e.target.value.replace(/\D/g, '') })} /></Field>
             <Field label="Weight"><Input mono value={d.srvWeight} onChange={(e) => set({ srvWeight: e.target.value.replace(/\D/g, '') })} /></Field>
             <Field label="Port"><Input mono value={d.srvPort} onChange={(e) => set({ srvPort: e.target.value.replace(/\D/g, '') })} /></Field>
-            <Field label="Target" error={errors.value}><Input mono value={d.srvTarget} onChange={(e) => set({ srvTarget: e.target.value.trim() })} placeholder="sip.example.com" /></Field>
+            <Field label="Target" error={errors.value}><Input mono value={d.srvTarget} onChange={(e) => set({ srvTarget: e.target.value.trim() })} placeholder="sip.regiocom-energie.de" /></Field>
           </div>
         )}
         {d.type === 'SRV' && (

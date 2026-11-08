@@ -19,7 +19,9 @@ import { StepIndicator, flag, SpecPill } from '@/components/hardware/visuals';
 import { toast } from '@/components/ui/toast';
 import { cn } from '@/lib/cn';
 import { num } from '@/lib/format';
-import type { BareMetalHost, HostProbe, Location, Tag } from '@/types';
+import { RoleToggleCards, AccessPicker, RoleChips, usePolicyNames } from '@/components/hardware/policy';
+import { OPEN_ACCESS, normaliseAccess, accessSummary, rolesSummary } from '@/lib/hostPolicy';
+import type { BareMetalHost, HostAccess, HostProbe, HostRole, Location, Tag } from '@/types';
 
 const STEPS = [
   { label: 'Connect BMC', description: 'Redfish / IPMI credentials' },
@@ -56,6 +58,9 @@ export default function HostCreate() {
   const [cpuOc, setCpuOc] = useState('4');
   const [ramOc, setRamOc] = useState('1');
   const [tags, setTags] = useState<Tag[]>([]);
+  const [roles, setRoles] = useState<HostRole[]>(['compute', 'k8s-worker']);
+  const [access, setAccess] = useState<HostAccess>({ ...OPEN_ACCESS });
+  const { names, accounts, projects } = usePolicyNames();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -102,7 +107,7 @@ export default function HostCreate() {
 
   const body = {
     name, locationId, rack: rack.toUpperCase(), rackUnit, sizeU, bmcIp: bmc.bmcIp, bmcUser: bmc.bmcUser, bmcPassword: bmc.bmcPassword ? '••••••••' : '', mgmtIp,
-    discover: mode, cpuOvercommit: Number(cpuOc), ramOvercommit: Number(ramOc), tags,
+    discover: mode, cpuOvercommit: Number(cpuOc), ramOvercommit: Number(ramOc), tags, roles, access: normaliseAccess(access),
     ...(mode === 'manual' ? { hardware: { vendor: hw.vendor, model: hw.model, cpuModel: hw.cpuModel, sockets: hw.sockets, cpuCores: hw.cpuCores, ramGB: hw.ramGB, nicGbps: hw.nicGbps, disks: hw.disks, gpus } } : {}),
   };
 
@@ -123,7 +128,8 @@ export default function HostCreate() {
   const ipErr = (v: string) => (v && !/^(\d{1,3}\.){3}\d{1,3}$/.test(v) ? 'Invalid IPv4 address' : undefined);
   const canConnect = !!bmc.bmcIp && !ipErr(bmc.bmcIp) && !!bmc.bmcUser && !!bmc.bmcPassword;
   const canDiscover = mode === 'auto' ? !!probe : !!hw.cpuModel && hw.cpuCores > 0 && hw.ramGB > 0;
-  const canConfigure = !!name && !nameErr && !!rack && !conflict && !!mgmtIp && !ipErr(mgmtIp) && mgmtIp !== bmc.bmcIp;
+  const policyOk = roles.length > 0 && (access.mode === 'all' || access.accountIds.length + access.projectIds.length > 0);
+  const canConfigure = !!name && !nameErr && !!rack && !conflict && !!mgmtIp && !ipErr(mgmtIp) && mgmtIp !== bmc.bmcIp && policyOk;
 
   if (step === 4 && createdId) return <Enrolling id={createdId} onAnother={() => { setCreatedId(null); setProbe(null); setStep(0); setBmc((b) => ({ ...b, bmcIp: '', bmcPassword: '' })); setName('') }} />;
 
@@ -157,6 +163,16 @@ export default function HostCreate() {
       </Field>
       <Field label="RAM overcommit" hint={`${ramGB} GB → ${capR} GB schedulable (8% hypervisor reserve)`} error={errors.ramOvercommit}>
         <Segmented value={ramOc} onChange={setRamOc} options={['1', '1.25', '1.5'].map((v) => ({ value: v, label: `${v}×` }))} />
+      </Field>
+    </div>
+  );
+  const policyFields = (
+    <div className="space-y-4">
+      <Field label="Workload roles" hint={pro ? 'What the scheduler may place on this host. Storage adds its disks to the Ceph pool of the location.' : undefined} error={errors.roles}>
+        <RoleToggleCards value={roles} onChange={setRoles} />
+      </Field>
+      <Field label="Availability" error={errors.access ?? errors['access.accountIds'] ?? errors['access.projectIds']}>
+        <AccessPicker value={access} onChange={setAccess} accounts={accounts} projects={projects} />
       </Field>
     </div>
   );
@@ -285,19 +301,25 @@ export default function HostCreate() {
                   </Field>
                 </div>
                 {pro ? (
-                  <div className="grid gap-5 @min-[40rem]:grid-cols-[minmax(0,1fr)_250px]">
-                    <div className="space-y-4">{rackFields}{ipFields}{ocFields}{tagsField}</div>
-                    {rackVisual}
-                  </div>
+                  <>
+                    <div className="grid gap-5 @min-[40rem]:grid-cols-[minmax(0,1fr)_250px]">
+                      <div className="space-y-4">{rackFields}{ipFields}{ocFields}{tagsField}</div>
+                      {rackVisual}
+                    </div>
+                    <div className="border-t border-line pt-5">{policyFields}</div>
+                  </>
                 ) : (
                   <>
-                    <Advanced title="Advanced" description={`Rack ${rack.toUpperCase() || '—'} · U${rackUnit ?? '—'} · IP ${mgmtIp || '—'} · overcommit · tags`}>
-                      <div className="grid gap-5 @min-[40rem]:grid-cols-[minmax(0,1fr)_250px]">
-                        <div className="space-y-4">{rackFields}{ipFields}{ocFields}{tagsField}</div>
-                        {rackVisual}
+                    <Advanced title="Advanced" description={`Rack ${rack.toUpperCase() || '—'} · U${rackUnit ?? '—'} · IP ${mgmtIp || '—'} · runs ${rolesSummary(roles)} · ${access.mode === 'all' ? 'all accounts' : 'restricted'}`}>
+                      <div className="space-y-5">
+                        <div className="grid gap-5 @min-[40rem]:grid-cols-[minmax(0,1fr)_250px]">
+                          <div className="space-y-4">{rackFields}{ipFields}{ocFields}{tagsField}</div>
+                          {rackVisual}
+                        </div>
+                        <div className="border-t border-line pt-5">{policyFields}</div>
                       </div>
                     </Advanced>
-                    {!canConfigure && !!name && !nameErr && <Hint tone="warning">Something in the advanced settings needs a look (rack slot or IP address).</Hint>}
+                    {!canConfigure && !!name && !nameErr && <Hint tone="warning">Something in the advanced settings needs a look ({!policyOk ? 'roles or availability' : 'rack slot or IP address'}).</Hint>}
                   </>
                 )}
                 <WizardNav onBack={() => setStep(1)} onNext={() => setStep(3)} nextDisabled={!canConfigure} />
@@ -316,6 +338,8 @@ export default function HostCreate() {
                   ['CPU', `${threads / 2} cores`],
                   ['Memory', `${ramGB} GB`],
                   ['GPUs', gpuCount ? gpus.map((g) => `${g.count}× ${g.model}`).join(', ') : 'none'],
+                  ['Runs', <RoleChips roles={roles} compact />],
+                  ['Available to', access.mode === 'all' ? 'All accounts' : accessSummary({ access }, names)],
                 ] : [
                   ['Hostname', <span className="font-mono">{name}</span>],
                   ['Location', `${flag(loc?.country)} ${loc?.name ?? locationId}`],
@@ -329,6 +353,8 @@ export default function HostCreate() {
                   ['Overcommit', `CPU ${cpuOc}× · RAM ${ramOc}×`],
                   ['Inventory', mode === 'auto' ? 'auto-discovered (re-verified during enrollment)' : 'manual'],
                   ['Tags', tags.length ? tags.map((t) => `${t.key}=${t.value}`).join(', ') : '—'],
+                  ['Roles', <RoleChips roles={roles} />],
+                  ['Availability', access.mode === 'all' ? 'All accounts & projects' : accessSummary({ access }, names)],
                 ]} />
                 <IacTabs snippets={{ terraform: toHcl('bare_metal_host', name || 'host', { ...body, bmcPassword: 'var.bmc_password' }), cli: toCli('host enroll', { ...body, bmcPassword: '$BMC_PASSWORD' }), curl: toCurl('POST', '/hosts', { ...body, bmcPassword: '…' }) }} />
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">

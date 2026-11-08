@@ -138,8 +138,8 @@ export default function LbCreate() {
 
   /* ---------------------------------------------------------------- building blocks */
   const nameField = (
-    <Field label="Name" required error={nameErr ?? errors.name} hint={pro ? 'e.g. web-lb, api-internal' : undefined}>
-      <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="web-lb" invalid={!!(nameErr ?? errors.name)} autoFocus />
+    <Field label="Name" required error={nameErr ?? errors.name} hint={pro ? 'e.g. compass-lb, website-lb' : undefined}>
+      <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="compass-lb" invalid={!!(nameErr ?? errors.name)} autoFocus />
     </Field>
   );
   const projectField = <ProjectField value={projectId} onChange={setProjectId} error={errors.projectId} />;
@@ -249,7 +249,7 @@ export default function LbCreate() {
         crumbs={[{ label: 'Load Balancers', to: '/managed-services/load-balancers' }, { label: 'Create' }]} />
       {formError && <Hint tone="danger" className="mb-5">{formError}{errKeys.length > 1 && <span className="block text-xs opacity-80">{errKeys.length} fields need attention below.</span>}</Hint>}
 
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="load balancer" aside={<>
         <CostPanel cost={cost} projectId={projectId} footer={
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" icon={Rocket} loading={create.isPending} disabled={!canSubmit} onClick={() => create.mutate()}>Create load balancer</Button>

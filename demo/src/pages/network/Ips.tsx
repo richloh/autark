@@ -323,7 +323,7 @@ function RdnsModal({ ip, onClose }: { ip: IpAddress | null; onClose: () => void 
     <Modal open={!!ip} onClose={onClose} title="Reverse DNS (PTR)" description="Mail servers and many services check that the PTR matches a forward A record."
       footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" loading={go.isPending} onClick={() => go.mutate()}>Save</Button></>}>
       <div className="space-y-3">
-        <Field label="Hostname" error={errors.reverseDns} hint="Leave empty to remove."><Input mono value={v} onChange={(e) => setV(e.target.value.trim().toLowerCase())} placeholder="mail.example.com" /></Field>
+        <Field label="Hostname" error={errors.reverseDns} hint="Leave empty to remove."><Input mono value={v} onChange={(e) => setV(e.target.value.trim().toLowerCase())} placeholder="mail.regiocom-energie.de" /></Field>
         <code className="block rounded-lg bg-surface-2 px-3 py-2 font-mono text-[12px] text-fg-2">{arpa}. IN PTR {v || '…'}{v && !v.endsWith('.') ? '.' : ''}</code>
       </div>
     </Modal>

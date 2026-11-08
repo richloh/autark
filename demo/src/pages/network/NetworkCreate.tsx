@@ -216,7 +216,7 @@ export default function NetworkCreate() {
       <PageHeader title="Create network" description={pro ? 'A private, isolated VPC. Plan the address space, carve subnets, and decide how traffic leaves it.' : 'A private network for your servers. The defaults work for most setups.'} icon={NetworkIcon} iconColor="#10b981"
         crumbs={[{ label: 'Networks', to: '/infrastructure/networks' }, { label: 'Create' }]} />
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="network" aside={<>
         <CostPanel cost={cost} projectId={projectId} footer={
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" icon={Rocket} loading={create.isPending} disabled={!canSubmit} onClick={() => create.mutate()}>Create network</Button>

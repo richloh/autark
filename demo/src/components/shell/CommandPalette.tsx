@@ -70,7 +70,7 @@ export function CommandPalette() {
       out.push({ id: `res-${r.kind}-${r.id}`, label: r.name, sub: r.subtitle, icon: meta?.icon ?? Search, iconColor: meta?.color, group: 'Resources', run: () => go(r.link) });
     });
     if (!s) recent.forEach((r) => out.push({ id: `recent-${r.link}`, label: r.name, sub: KINDS[r.kind as ResourceKind]?.label, icon: History, group: 'Recent', run: () => go(r.link) }));
-    CREATE_ACTIONS.forEach(([label, to, kind]) => {
+    CREATE_ACTIONS.filter(([, , kind]) => useUi.getState().pro || (kind !== 'bareMetal' && kind !== 'provider')).forEach(([label, to, kind]) => {
       const c: Cmd = { id: `create-${to}`, label, icon: Plus, iconColor: KINDS[kind].color, group: 'Create', run: () => go(to), keywords: `new add ${KINDS[kind].plural}` };
       if (match(c)) out.push(c);
     });

@@ -276,7 +276,7 @@ export default function VolumeCreate() {
       />
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
 
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="volume" aside={<>
         <CostPanel cost={cost} projectId={projectId} footer={
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" icon={Rocket} loading={create.isPending} disabled={!canSubmit} onClick={() => create.mutate()}>Create volume</Button>

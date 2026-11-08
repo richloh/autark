@@ -3,6 +3,15 @@ import type { ID, ISODate, Tag } from './common';
 export type HostStatus =
   | 'discovering' | 'provisioning' | 'ready' | 'maintenance' | 'draining' | 'offline' | 'error' | 'decommissioning' | 'rebooting' | 'updating';
 
+/** What Autark may schedule onto a host. */
+export type HostRole = 'compute' | 'storage' | 'k8s-worker' | 'k8s-control-plane' | 'load-balancer';
+export const HOST_ROLES: HostRole[] = ['compute', 'storage', 'k8s-worker', 'k8s-control-plane', 'load-balancer'];
+/** Roles assumed when a host has no explicit roles (older data). */
+export const DEFAULT_HOST_ROLES: HostRole[] = ['compute', 'k8s-worker', 'k8s-control-plane'];
+
+/** Who may use a host. 'all' = every account/project; 'restricted' = only the listed accounts/projects. */
+export interface HostAccess { mode: 'all' | 'restricted'; accountIds: ID[]; projectIds: ID[] }
+
 export interface HostDisk { slot: string; type: 'ssd' | 'nvme' | 'hdd'; sizeGB: number; health: 'ok' | 'warning' | 'failed'; wearPct: number; model?: string; powerOnHours?: number; reallocatedSectors?: number; tempC?: number }
 export interface HostNic { name: string; speedGbps: number; mac: string; link: 'up' | 'down'; role?: 'data' | 'storage' | 'bmc' | 'mgmt'; mtu?: number }
 
@@ -55,6 +64,10 @@ export interface BareMetalHost {
   updatedAt?: ISODate;
   tags: Tag[];
   powerWatts: number;
+  /** workload roles this host serves (optional; DEFAULT_HOST_ROLES when absent) */
+  roles?: HostRole[];
+  /** availability restriction (optional; open to everyone when absent) */
+  access?: HostAccess;
   /** optional enrichment */
   bmcUser?: string;
   bmcCredential?: string; // masked, never raw

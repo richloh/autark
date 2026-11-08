@@ -29,6 +29,9 @@ import { RackElevation } from '@/components/hardware/RackElevation';
 import { Gauge, AllocationBar } from '@/components/hardware/gauges';
 import { useHostActions } from '@/components/hardware/hostActions';
 import { HOST_STATUS_HEX, hostStatusLabel, hostUtil, gpuTotal, flag, utilColor } from '@/components/hardware/visuals';
+import { HostPolicyTab } from '@/components/hardware/HostPolicyTab';
+import { PolicySummary, RoleChips, AccessLock, usePolicyNames } from '@/components/hardware/policy';
+import { hostRoles, policyReason, runsWorkloads, type PolicyNames } from '@/lib/hostPolicy';
 import { cn } from '@/lib/cn';
 import { timeAgo, dateTime, num, duration } from '@/lib/format';
 import type { BareMetalHost, HostVmSummary, Location, Project } from '@/types';
@@ -43,8 +46,9 @@ export default function HostDetail() {
   const op = useActiveOperation(id);
   const pro = usePro();
   const [tabParam, setTab] = useTabParam('overview');
-  const tab = pro || ['overview', 'vms', 'settings'].includes(tabParam) ? tabParam : 'overview';
+  const tab = pro || ['overview', 'vms', 'policy', 'settings'].includes(tabParam) ? tabParam : 'overview';
   const actions = useHostActions();
+  const { names } = usePolicyNames();
 
   if (isLoading) return <Page><Skeleton className="mb-4 h-12 w-80" /><Skeleton className="h-96 rounded-xl" /></Page>;
   if (error || !h) return <Page><EmptyState icon={Cpu} title="Host not found" description="It may have been decommissioned." action={<Button to="/hardware/bare-metals">Back to hosts</Button>} /></Page>;
@@ -65,6 +69,8 @@ export default function HostDetail() {
           <span className="flex items-center gap-1">{flag(loc?.country)} {loc?.name ?? h.locationId}</span>
           {pro && <span className="flex items-center gap-1"><Server className="size-3" />{h.rack} · U{h.rackUnit}{h.sizeU > 1 ? `–${h.rackUnit + h.sizeU - 1}` : ''}</span>}
           <span>{h.vendor} {h.model}</span>
+          <RoleChips roles={hostRoles(h)} compact />
+          <AccessLock h={h} names={names} withText />
           {h.cpuCores > 0 && !pro && <span>{h.cpuCores} cores · {num(h.ramGB)} GB</span>}
           {pro && <span className="font-mono">{h.mgmtIp}</span>}
           {h.status !== 'offline' && h.status !== 'provisioning' && <span className="flex items-center gap-1"><Clock className="size-3" />up {duration(Date.now() - Date.parse(h.bootedAt))}</span>}
@@ -88,10 +94,12 @@ export default function HostDetail() {
         { id: 'health', label: 'Health', icon: health && health.result !== 'passed' ? <span className={cn('size-1.5 rounded-full', health.result === 'failed' ? 'bg-rose-500' : 'bg-amber-500')} /> : undefined },
         { id: 'metrics', label: 'Metrics' },
         { id: 'activity', label: 'Activity' },
+        { id: 'policy', label: 'Policy' },
         { id: 'settings', label: 'Settings' },
       ] : [
         { id: 'overview', label: 'Overview' },
         { id: 'vms', label: 'Virtual machines', count: h.vms?.length ?? 0 },
+        { id: 'policy', label: 'Policy' },
         { id: 'settings', label: 'Settings' },
       ]} />
 
@@ -140,12 +148,14 @@ export default function HostDetail() {
               </div>
             </Card>
             </Pro>
+            <PolicySummary h={h} names={names} onEdit={() => setTab('policy')} />
             <QuickHealth h={h} onOpen={pro ? () => setTab('health') : undefined} busy={!!op} onRun={() => actions.act(h, 'runHealthCheck', 'Health check started')} />
           </div>
         </div>
       )}
 
-      {tab === 'vms' && <VmsTab h={h} hosts={allHosts} projects={projects} />}
+      {tab === 'vms' && <VmsTab h={h} hosts={allHosts} projects={projects} names={names} />}
+      {tab === 'policy' && <HostPolicyTab h={h} />}
       {tab === 'hardware' && <HardwareTab h={h} actions={actions} busy={!!op} />}
       {tab === 'health' && <HealthTab h={h} busy={!!op} onRun={() => actions.act(h, 'runHealthCheck', 'Health check started')} />}
       {tab === 'metrics' && (
@@ -214,6 +224,14 @@ function StatusBanner({ h, busy, actions, onHealth }: { h: BareMetalHost; busy: 
 
 /* ------------------------------------------------------------------ overview */
 
+type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb';
+const MANAGED: Record<ManagedKind, { color: string; label: string; legend: string; link: (id: string) => string }> = {
+  db: { color: '#3b82f6', label: 'Managed database', legend: 'Managed databases', link: (id) => `/managed-services/db/${id}` },
+  k8s: { color: '#326ce5', label: 'Kubernetes worker node', legend: 'Kubernetes workers', link: (id) => `/managed-services/kubernetes/${id}` },
+  'k8s-cp': { color: '#0891b2', label: 'Kubernetes control plane', legend: 'Control planes', link: (id) => `/managed-services/kubernetes/${id}` },
+  lb: { color: '#c026d3', label: 'Load balancer node', legend: 'Load balancers', link: (id) => `/managed-services/load-balancers/${id}` },
+};
+
 function CapacityCard({ h, projects }: { h: BareMetalHost; projects: Map<string, Project> }) {
   const pro = usePro();
   const [viewState, setView] = useState<'bars' | 'treemap'>('bars');
@@ -226,17 +244,16 @@ function CapacityCard({ h, projects }: { h: BareMetalHost; projects: Map<string,
     sub: `${projects.get(v.projectId)?.name ?? v.projectId} · ${v.status}`,
   });
   const usedProjects = [...new Set(vms.map((v) => v.projectId))];
-  const managed: { kind: 'db' | 'k8s'; id: string; name: string; vcpus: number; ramGB: number; gpus?: number }[] = (h.allocated as any)?.managedItems ?? [];
+  const managed: { kind: ManagedKind; id: string; name: string; vcpus: number; ramGB: number; gpus?: number }[] = (h.allocated as any)?.managedItems ?? [];
   const mseg = (m: (typeof managed)[number], value: number) => ({
-    id: `${m.kind}-${m.name}`, label: m.name, value, color: m.kind === 'db' ? '#3b82f6' : '#326ce5',
-    link: m.kind === 'db' ? `/managed-services/db/${m.id}` : `/managed-services/kubernetes/${m.id}`, sub: m.kind === 'db' ? 'Managed database' : 'Kubernetes worker node',
+    id: `${m.kind}-${m.name}`, label: m.name, value, color: MANAGED[m.kind].color, link: MANAGED[m.kind].link(m.id), sub: MANAGED[m.kind].label,
   });
-  if (h.hypervisor !== 'KVM') return (
-    <Card><CardHeader title="Capacity" icon={Activity} /><CardBody><Hint>This is a storage node (no hypervisor). It serves the Ceph cluster and does not host VMs.</Hint></CardBody></Card>
+  if (!runsWorkloads(h)) return (
+    <Card><CardHeader title="Capacity" icon={Activity} /><CardBody><Hint>{h.hypervisor !== 'KVM' ? 'This is a storage node (no hypervisor).' : 'This host only has the Storage role.'} It serves the Ceph cluster of {h.locationId} ({num(Math.round(h.disks.reduce((a, d) => a + d.sizeGB, 0) / 100) / 10)} TB raw) and does not run VMs or other workloads.</Hint></CardBody></Card>
   );
   return (
     <Card>
-      <CardHeader title={pro ? 'Capacity allocation' : 'Allocation'} icon={Activity} description={`${vms.length} VM${vms.length === 1 ? '' : 's'}${managed.length ? ` + ${managed.length} managed workload${managed.length === 1 ? '' : 's'}${pro ? ' (databases, Kubernetes nodes)' : ''}` : ''} on this host`}
+      <CardHeader title={pro ? 'Capacity allocation' : 'Allocation'} icon={Activity} description={`${vms.length} VM${vms.length === 1 ? '' : 's'}${managed.length ? ` + ${managed.length} managed workload${managed.length === 1 ? '' : 's'}${pro ? ` (${[...new Set(managed.map((m) => MANAGED[m.kind].legend.toLowerCase()))].join(', ')})` : ''}` : ''} on this host`}
         actions={pro && <Segmented size="sm" value={view} onChange={setView} options={[{ value: 'bars', label: 'Bars' }, { value: 'treemap', label: 'Treemap' }]} />} />
       <CardBody className="space-y-6">
         {view === 'bars' ? (
@@ -280,8 +297,7 @@ function CapacityCard({ h, projects }: { h: BareMetalHost; projects: Map<string,
         {(usedProjects.length > 0 || managed.length > 0) && (
           <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-3 text-[11px] text-muted">
             {usedProjects.map((p) => <span key={p} className="flex items-center gap-1.5"><span className="size-2 rounded-sm" style={{ background: projects.get(p)?.color ?? '#64748b' }} />{projects.get(p)?.name ?? p}</span>)}
-            {managed.some((m) => m.kind === 'db') && <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-[#3b82f6]" />Managed databases</span>}
-            {managed.some((m) => m.kind === 'k8s') && <span className="flex items-center gap-1.5"><span className="size-2 rounded-sm bg-[#326ce5]" />Kubernetes nodes</span>}
+            {(Object.keys(MANAGED) as ManagedKind[]).filter((k) => managed.some((m) => m.kind === k)).map((k) => <span key={k} className="flex items-center gap-1.5"><span className="size-2 rounded-sm" style={{ background: MANAGED[k].color }} />{MANAGED[k].legend}</span>)}
           </div>
         )}
       </CardBody>
@@ -351,7 +367,7 @@ const CheckIcon = ({ status }: { status: string }) => status === 'ok'
 
 /* ------------------------------------------------------------------ VMs */
 
-function VmsTab({ h, hosts, projects }: { h: BareMetalHost; hosts: BareMetalHost[]; projects: Map<string, Project> }) {
+function VmsTab({ h, hosts, projects, names }: { h: BareMetalHost; hosts: BareMetalHost[]; projects: Map<string, Project>; names: PolicyNames }) {
   const accountId = useUi((s) => s.accountId);
   const pro = usePro();
   const [migrating, setMigrating] = useState<HostVmSummary | null>(null);
@@ -379,21 +395,22 @@ function VmsTab({ h, hosts, projects }: { h: BareMetalHost; hosts: BareMetalHost
         rowActions={(v) => <Button size="xs" variant="ghost" icon={MoveRight} disabled={!['running', 'stopped'].includes(v.status)} onClick={() => setMigrating(v)}>Migrate</Button>}
         toolbar={pro ? <span className="text-xs text-muted">Live migration moves running VMs with &lt;50 ms pause.</span> : undefined}
         empty={{ icon: Server, title: 'No VMs on this host', description: 'VMs are placed automatically on the best-fitting ready host in the location.' }} />
-      <MigrateModal vm={migrating} host={h} hosts={hosts} onClose={() => setMigrating(null)} />
+      <MigrateModal vm={migrating} host={h} hosts={hosts} names={names} onClose={() => setMigrating(null)} />
     </>
   );
 }
 
-function MigrateModal({ vm, host, hosts, onClose }: { vm: HostVmSummary | null; host: BareMetalHost; hosts: BareMetalHost[]; onClose: () => void }) {
+function MigrateModal({ vm, host, hosts, names, onClose }: { vm: HostVmSummary | null; host: BareMetalHost; hosts: BareMetalHost[]; names: PolicyNames; onClose: () => void }) {
   const [target, setTarget] = useState<string>('auto');
   useEffect(() => setTarget('auto'), [vm?.id]);
   const candidates = useMemo(() => hosts.filter((x) => x.locationId === host.locationId && x.id !== host.id && x.hypervisor === 'KVM').map((x) => {
     const u = hostUtil(x);
     const fitsGpu = !vm?.gpus || (u.cap.gpus - u.a.gpus >= vm.gpus && x.gpus.some((g) => host.gpus.some((hg) => hg.model === g.model)));
-    const ok = x.status === 'ready' && !!vm && u.cap.vcpus - u.a.vcpus >= vm.vcpus && u.cap.ramGB - u.a.ramGB >= vm.ramGB && fitsGpu;
-    const reason = x.status !== 'ready' ? x.status : !fitsGpu ? 'no free GPU' : 'insufficient capacity';
+    const policy = vm ? policyReason(x, { role: 'compute', accountId: vm.accountId, projectId: vm.projectId }, names) : null;
+    const ok = !policy && x.status === 'ready' && !!vm && u.cap.vcpus - u.a.vcpus >= vm.vcpus && u.cap.ramGB - u.a.ramGB >= vm.ramGB && fitsGpu;
+    const reason = policy ?? (x.status !== 'ready' ? x.status : !fitsGpu ? 'no free GPU' : 'insufficient capacity');
     return { x, u, ok, reason };
-  }).sort((a, b) => Number(b.ok) - Number(a.ok) || (b.u.cap.ramGB - b.u.a.ramGB) - (a.u.cap.ramGB - a.u.a.ramGB)), [hosts, host, vm]);
+  }).sort((a, b) => Number(b.ok) - Number(a.ok) || (b.u.cap.ramGB - b.u.a.ramGB) - (a.u.cap.ramGB - a.u.a.ramGB)), [hosts, host, vm, names]);
   const m = useApiMutation(() => api.action('hosts', host.id, 'migrateVm', { vmId: vm!.id, hostId: target === 'auto' ? undefined : target }), {
     success: () => `Migrating ${vm?.name}`, onSuccess: onClose,
   });
@@ -403,13 +420,13 @@ function MigrateModal({ vm, host, hosts, onClose }: { vm: HostVmSummary | null; 
       <div className="space-y-2">
         <button type="button" onClick={() => setTarget('auto')} className={cn('flex w-full items-center gap-3 rounded-xl border p-3 text-left', target === 'auto' ? 'border-brand-500 bg-brand-500/5 ring-3 ring-brand-500/15' : 'border-line hover:bg-surface-2')}>
           <span className="flex size-8 items-center justify-center rounded-lg bg-brand-500/10 text-brand-500"><RefreshCcw className="size-4" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-fg">Automatic placement</span><span className="text-xs text-muted">Scheduler picks the ready host with the most free memory</span></span>
+          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-fg">Automatic placement</span><span className="text-xs text-muted">Scheduler picks the best ready host this VM's project may use</span></span>
         </button>
         {candidates.map(({ x, u, ok, reason }) => (
           <button key={x.id} type="button" disabled={!ok} onClick={() => setTarget(x.id)} className={cn('flex w-full items-center gap-3 rounded-xl border p-3 text-left disabled:cursor-not-allowed disabled:opacity-50', target === x.id ? 'border-brand-500 bg-brand-500/5 ring-3 ring-brand-500/15' : 'border-line hover:bg-surface-2')}>
             <span className="size-2 shrink-0 rounded-full" style={{ background: HOST_STATUS_HEX[x.status] }} />
             <span className="min-w-0 flex-1">
-              <span className="flex items-center justify-between gap-2"><span className="truncate font-mono text-[13px] text-fg">{x.name}</span>{!ok && <span className="text-[11px] text-rose-500">{reason}</span>}</span>
+              <span className="flex items-center justify-between gap-2"><span className="truncate font-mono text-[13px] text-fg">{x.name}</span>{!ok && <span className="min-w-0 truncate text-[11px] text-rose-500" title={reason}>{reason}</span>}</span>
               <span className="mt-1.5 grid grid-cols-2 gap-3">
                 <MiniUse label="vCPU" used={u.a.vcpus} add={vm?.vcpus ?? 0} cap={u.cap.vcpus} />
                 <MiniUse label="RAM" used={u.a.ramGB} add={vm?.ramGB ?? 0} cap={u.cap.ramGB} />

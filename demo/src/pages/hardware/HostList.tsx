@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Cpu, Plus, MoreHorizontal, Server, MemoryStick, Gpu, Zap, Building2, Rows3, List, Grid3x3, HeartPulse, Download, Wrench, ArrowUpCircle, Activity } from 'lucide-react';
+import { Cpu, Plus, MoreHorizontal, Server, MemoryStick, Gpu, Zap, Building2, Rows3, List, Grid3x3, HeartPulse, Download, Wrench, ArrowUpCircle, Activity, Scale, Lock } from 'lucide-react';
 import { useList, useLookup } from '@/api/hooks';
 import { Page, PageHeader } from '@/components/ui/PageHeader';
 import { Button, IconButton } from '@/components/ui/Button';
@@ -19,8 +19,12 @@ import { RackElevation } from '@/components/hardware/RackElevation';
 import { CapacityHeatmap } from '@/components/hardware/CapacityHeatmap';
 import { useHostActions } from '@/components/hardware/hostActions';
 import { HOST_STATUS_HEX, hostStatusLabel, hostUtil, gpuTotal, flag, Led, utilColor } from '@/components/hardware/visuals';
+import { Select } from '@/components/ui/form';
+import { RoleChips, AccessLock, BulkPolicyModal, usePolicyNames, ROLE_ICON } from '@/components/hardware/policy';
+import { FleetRoles } from '@/components/hardware/FleetRoles';
+import { hostRoles, hostAllows, isRestricted, ROLE_META } from '@/lib/hostPolicy';
 import { num } from '@/lib/format';
-import type { BareMetalHost, Location, Operation } from '@/types';
+import { HOST_ROLES, type BareMetalHost, type HostRole, type Location, type Operation } from '@/types';
 
 type StatusFilter = 'all' | 'ready' | 'attention' | 'busy';
 const ENERGY_EUR_KWH = 0.24;
@@ -37,14 +41,20 @@ export default function HostList() {
   const view = pro ? viewParam : 'table';
   const [loc, setLoc] = useState<string>('all');
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [role, setRole] = useState<'all' | HostRole>('all');
+  const [account, setAccount] = useState<string>('all');
+  const [bulkPolicy, setBulkPolicy] = useState<{ hosts: BareMetalHost[]; mode: 'roles' | 'access' } | null>(null);
   const actions = useHostActions();
+  const { names, accounts } = usePolicyNames();
 
   const opsByHost = useMemo(() => new Map(ops.filter((o) => o.target.type === 'bareMetal').map((o) => [o.target.id, o])), [ops]);
   const locIds = [...new Set(hosts.map((h) => h.locationId))].sort();
   const inLoc = hosts.filter((h) => !pro || loc === 'all' || h.locationId === loc);
   const isAttention = (h: BareMetalHost) => ['maintenance', 'offline', 'error', 'draining'].includes(h.status) || h.lastHealthCheck?.result === 'warnings' || h.lastHealthCheck?.result === 'failed';
   const isBusy = (h: BareMetalHost) => opsByHost.has(h.id) || ['provisioning', 'rebooting', 'updating', 'decommissioning'].includes(h.status);
-  const rows = inLoc.filter((h) => status === 'all' || (status === 'ready' ? h.status === 'ready' : status === 'attention' ? isAttention(h) : isBusy(h)));
+  const rows = inLoc.filter((h) => (status === 'all' || (status === 'ready' ? h.status === 'ready' : status === 'attention' ? isAttention(h) : isBusy(h)))
+    && (role === 'all' || hostRoles(h).includes(role))
+    && (!pro || account === 'all' || (account === 'restricted' ? isRestricted(h) : isRestricted(h) && hostAllows(h, { accountId: account }))));
 
   // fleet stats
   const stats = useMemo(() => {
@@ -114,9 +124,18 @@ export default function HostList() {
       ),
     },
     {
+      id: 'roles', header: 'Roles', hideBelow: 'lg', sort: (h) => hostRoles(h).join(),
+      cell: (h) => (
+        <div className="flex max-w-[180px] flex-col gap-1">
+          <RoleChips roles={hostRoles(h)} compact />
+          <AccessLock h={h} names={names} withText />
+        </div>
+      ),
+    },
+    {
       id: 'alloc', header: 'Allocation', sort: (h) => hostUtil(h).ram,
       cell: (h) => {
-        if (h.hypervisor !== 'KVM') return <span className="text-xs text-muted">storage node</span>;
+        if (!hostRoles(h).some((r) => r !== 'storage') || h.hypervisor !== 'KVM') return <span className="text-xs text-muted">storage only</span>;
         const u = hostUtil(h);
         return (
           <div className="w-36 space-y-1">
@@ -141,7 +160,10 @@ export default function HostList() {
       id: 'name', header: 'Host', sort: (h) => h.name,
       cell: (h) => (
         <div className="min-w-0">
-          <Link to={`/hardware/bare-metals/${h.id}`} className="block truncate font-mono text-[13px] font-medium text-fg hover:text-brand-500">{h.name}</Link>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Link to={`/hardware/bare-metals/${h.id}`} className="block truncate font-mono text-[13px] font-medium text-fg hover:text-brand-500">{h.name}</Link>
+            <AccessLock h={h} names={names} />
+          </span>
           <div className="truncate text-[11.5px] text-muted">{h.vendor} {h.model}{gpuTotal(h) > 0 ? ` · ${gpuTotal(h)}× GPU` : ''}</div>
         </div>
       ),
@@ -158,11 +180,12 @@ export default function HostList() {
       id: 'specs', header: 'CPU / RAM', hideBelow: 'sm', sort: (h) => h.threads,
       cell: (h) => <span className="whitespace-nowrap tabular text-fg-2">{h.cpuCores ? `${h.cpuCores} cores · ${h.ramGB >= 1024 ? `${(h.ramGB / 1024).toFixed(1)} TB` : `${h.ramGB} GB`}` : <span className="text-muted">discovering…</span>}</span>,
     },
+    { id: 'roles', header: 'Runs', hideBelow: 'lg', sort: (h) => hostRoles(h).join(), cell: (h) => <RoleChips roles={hostRoles(h)} compact /> },
     { id: 'vms', header: 'VMs', align: 'right', sort: (h) => h.allocated?.vms ?? 0, cell: (h) => <span className="tabular text-fg">{h.allocated?.vms ?? 0}</span> },
     {
       id: 'util', header: 'Used', hideBelow: 'md', sort: (h) => Math.max(hostUtil(h).cpu, hostUtil(h).ram),
       cell: (h) => {
-        if (h.hypervisor !== 'KVM') return <span className="text-xs text-muted">storage</span>;
+        if (!hostRoles(h).some((r) => r !== 'storage') || h.hypervisor !== 'KVM') return <span className="text-xs text-muted">storage</span>;
         const u = hostUtil(h); const r = Math.max(u.cpu, u.ram);
         return (
           <div className="flex w-28 items-center gap-2" title={`vCPU ${Math.round(u.cpu * 100)}% · RAM ${Math.round(u.ram * 100)}%`}>
@@ -186,6 +209,18 @@ export default function HostList() {
       { value: 'table', label: 'Table', icon: <List className="size-3.5" /> },
       { value: 'capacity', label: 'Capacity', icon: <Grid3x3 className="size-3.5" /> },
     ]} />
+  );
+  const roleCount = (r: HostRole) => inLoc.filter((h) => hostRoles(h).includes(r)).length;
+  const roleChips = (
+    <FilterChips value={role} onChange={setRole} options={[{ value: 'all' as const, label: 'All roles' }, ...HOST_ROLES.filter((r) => roleCount(r) > 0).map((r) => ({ value: r, label: ROLE_META[r].short, count: roleCount(r) }))]} />
+  );
+  const roleSelect = (
+    <Select aria-label="Filter by role" className="w-40" value={role} onChange={(e) => setRole(e.target.value as 'all' | HostRole)}
+      options={[{ value: 'all', label: 'All roles' }, ...HOST_ROLES.filter((r) => roleCount(r) > 0).map((r) => ({ value: r, label: `${ROLE_META[r].short} (${roleCount(r)})` }))]} />
+  );
+  const accountSelect = (
+    <Select aria-label="Filter by availability" className="w-48" value={account} onChange={(e) => setAccount(e.target.value)}
+      options={[{ value: 'all', label: 'Any availability' }, { value: 'restricted', label: `Restricted (${inLoc.filter(isRestricted).length})` }, ...accounts.map((a) => ({ value: a.id, label: `Reserved for ${a.name}` }))]} />
   );
   const statusChips = (
     <FilterChips value={status} onChange={setStatus} options={[
@@ -213,6 +248,7 @@ export default function HostList() {
         <Stat label="Allocated" value={`${Math.round(stats.cpuPct * 100)}% vCPU`} icon={Activity} sub={`${Math.round(stats.ramPct * 100)}% RAM · ${num(stats.useV)}/${num(stats.capV)} vCPU`} />
         <Stat label="Power draw" value={`${stats.kw.toFixed(1)} kW`} icon={Zap} sub={`≈ €${num(Math.round(stats.energy))}/mo energy (PUE ${PUE})`} accent="#f59e0b" className="col-span-2 @min-[40rem]:col-span-1" />
       </div>
+      {view !== 'table' && <FleetRoles hosts={inLoc} locationFilter={loc} className="mb-5" onRole={(r) => { setRole(r); setView('table') }} />}
 
       </Pro>
 
@@ -229,6 +265,7 @@ export default function HostList() {
           <div className="flex flex-wrap items-center gap-2">
             <FilterChips value={loc} onChange={setLoc} options={[{ value: 'all', label: 'All locations', count: hosts.length }, ...locIds.map((id) => ({ value: id, label: `${flag(locations.get(id)?.country)} ${locations.get(id)?.name ?? id}`, count: hosts.filter((h) => h.locationId === id).length }))]} />
             {view === 'racks' && statusChips}
+            {view === 'racks' && roleSelect}
           </div>
           {viewToggle}
         </div>
@@ -255,7 +292,7 @@ export default function HostList() {
                 <div className="overflow-x-auto p-4">
                   <div className="flex gap-6">
                     {racks.map((r) => (
-                      <RackElevation key={r} name={r} className="w-[240px]" hosts={list.filter((h) => h.rack === r)} opsByHost={opsByHost} onSelect={(h) => navigate(`/hardware/bare-metals/${h.id}`)}
+                      <RackElevation key={r} name={r} className="w-[240px]" hosts={list.filter((h) => h.rack === r)} opsByHost={opsByHost} onSelect={(h) => navigate(`/hardware/bare-metals/${h.id}`)} showRoles
                         subtitle={`${all.filter((h) => h.rack === r).length} hosts`} />
                     ))}
                     <RackLegend />
@@ -289,17 +326,22 @@ export default function HostList() {
           toolbar={pro ? <>
             <FilterChips value={loc} onChange={setLoc} options={[{ value: 'all', label: 'All', count: hosts.length }, ...locIds.map((id) => ({ value: id, label: id.toUpperCase(), count: hosts.filter((h) => h.locationId === id).length }))]} />
             {statusChips}
+            {roleChips}
+            {accountSelect}
             {viewToggle}
-          </> : statusChips}
+          </> : <>{statusChips}{roleSelect}</>}
           bulkActions={!pro ? undefined : [
             { label: 'Run health check', icon: HeartPulse, onClick: (r) => bulk(r, 'runHealthCheck') },
             { label: 'Update agent', icon: Download, onClick: (r) => bulk(r, 'updateAgent') },
+            { label: 'Set roles…', icon: Scale, onClick: (r) => setBulkPolicy({ hosts: r, mode: 'roles' }) },
+            { label: 'Restrict…', icon: Lock, onClick: (r) => setBulkPolicy({ hosts: r, mode: 'access' }) },
             { label: 'Maintenance', icon: Wrench, onClick: (r) => { if (r.length === 1) actions.openMaintenance(r[0]); else toast.info('Enter maintenance one host at a time', 'Evacuations are planned per host so capacity is never double-booked.') } },
           ]}
           empty={{ icon: Cpu, title: 'No hosts match', description: 'Adjust the filters or enroll a new host.' }}
         />
       )}
       {actions.modal}
+      <BulkPolicyModal hosts={bulkPolicy?.hosts ?? []} mode={bulkPolicy?.mode ?? null} onClose={() => setBulkPolicy(null)} />
     </Page>
   );
 }
@@ -313,6 +355,11 @@ function RackLegend() {
         {items.map(([s, l]) => <li key={s} className="flex items-center gap-2"><span className="h-2.5 w-4 rounded-sm" style={{ background: HOST_STATUS_HEX[s] }} />{l}</li>)}
         <li className="flex items-center gap-2"><span className="rounded-[2px] bg-violet-500/80 px-1 font-mono text-[8px] font-semibold text-white">GPU</span>GPU host</li>
         <li className="flex items-center gap-2"><span className="h-1 w-4 rounded-full bg-indigo-400" />CPU / RAM allocated</li>
+      </ul>
+      <div className="mb-2 mt-3 font-medium uppercase tracking-wide text-faint">Roles</div>
+      <ul className="space-y-1.5">
+        {HOST_ROLES.map((r) => { const Icon = ROLE_ICON[r]; return <li key={r} className="flex items-center gap-2"><span className="flex size-4 items-center justify-center rounded-[3px] bg-zinc-800 text-zinc-200"><Icon className="size-2.5" /></span>{ROLE_META[r].short}</li> })}
+        <li className="flex items-center gap-2"><Lock className="size-3.5 text-amber-500" />Reserved (restricted)</li>
       </ul>
       <p className="mt-3 leading-snug">Hover a server for details, click to open it.</p>
     </div>

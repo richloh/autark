@@ -110,7 +110,7 @@ export default function UserList() {
   ];
 
   // Simple mode: name/email, the single most important role, status, last login.
-  const ROLE_RANK = ['role-admin', 'role-ops', 'role-billing', 'role-developer', 'role-ml', 'role-viewer'];
+  const ROLE_RANK = ['role-admin', 'role-ops', 'role-billing', 'role-sap-basis', 'role-compass-dev', 'role-ai-platform', 'role-developer', 'role-viewer'];
   const mainRole = (u: User) => [...u.roleIds].sort((a, b) => (ROLE_RANK.indexOf(a) + 1 || 99) - (ROLE_RANK.indexOf(b) + 1 || 99))[0];
   const simpleColumns: Column<User>[] = [
     columns[0],

@@ -39,7 +39,7 @@ export function InviteUserModal({ open, onClose, onInvited }: { open: boolean; o
   const list = useMemo(() => [...new Set(emails.split(/[\s,;]+/).map((e) => e.trim().toLowerCase()).filter(Boolean))], [emails]);
   const invalid = list.filter((e) => !EMAIL_RE.test(e));
   const single = list.length <= 1;
-  const body = { email: list[0] ?? 'jane@example.com', ...(single && name ? { name } : {}), roleIds, projectIds, mfaRequired, sso };
+  const body = { email: list[0] ?? 'max.mustermann@regiocom-energie.de', ...(single && name ? { name } : {}), roleIds, projectIds, mfaRequired, sso };
 
   const reset = () => { setEmails(''); setName(''); setRoleIds(['role-developer']); setProjectIds(pro ? [] : '*'); setMfaRequired(true); setSso(false); setErrors({}); setShowCode(false) };
   const close = () => { reset(); onClose() };
@@ -79,7 +79,7 @@ export function InviteUserModal({ open, onClose, onInvited }: { open: boolean; o
       {!pro ? (
       <div className="space-y-5">
         <Field label="Email" required error={errors.email || (invalid.length ? `Invalid: ${invalid.join(', ')}` : undefined)} hint="Add several, separated by commas.">
-          <Textarea value={emails} onChange={(e) => { setEmails(e.target.value); setErrors({}) }} placeholder="jane@example.com" className="min-h-[38px]" rows={list.length > 1 ? 3 : 1} invalid={!!errors.email || invalid.length > 0} autoFocus />
+          <Textarea value={emails} onChange={(e) => { setEmails(e.target.value); setErrors({}) }} placeholder="max.mustermann@regiocom-energie.de" className="min-h-[38px]" rows={list.length > 1 ? 3 : 1} invalid={!!errors.email || invalid.length > 0} autoFocus />
         </Field>
         <Field label="Role" required error={errors.roleIds}>
           <Select value={simpleRole ?? 'custom'} onChange={(e) => { if (e.target.value !== 'custom') setRoleIds([e.target.value]) }}
@@ -107,7 +107,7 @@ export function InviteUserModal({ open, onClose, onInvited }: { open: boolean; o
       <div className="space-y-5">
         <div className="grid [&>*]:min-w-0 gap-4 @min-[36rem]:grid-cols-[minmax(0,1fr)_220px]">
           <Field label="Email addresses" required error={errors.email || (invalid.length ? `Invalid: ${invalid.join(', ')}` : undefined)} hint="Separate several addresses with commas or new lines.">
-            <Textarea value={emails} onChange={(e) => { setEmails(e.target.value); setErrors({}) }} placeholder="jane@example.com, joe@example.com" className="min-h-[38px]" rows={list.length > 1 ? 3 : 1} invalid={!!errors.email || invalid.length > 0} />
+            <Textarea value={emails} onChange={(e) => { setEmails(e.target.value); setErrors({}) }} placeholder="max.mustermann@regiocom-energie.de, erika.musterfrau@regiocom-energie.de" className="min-h-[38px]" rows={list.length > 1 ? 3 : 1} invalid={!!errors.email || invalid.length > 0} />
           </Field>
           <Field label="Full name" optional hint={single ? 'Defaults to the email name' : 'Only for single invites'}>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" disabled={!single} />

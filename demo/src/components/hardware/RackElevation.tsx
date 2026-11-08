@@ -1,7 +1,9 @@
 import { overlayRoot } from '@/lib/overlay';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Cpu, MemoryStick, Gpu, Zap, Server } from 'lucide-react';
+import { Cpu, MemoryStick, Gpu, Zap, Server, Lock } from 'lucide-react';
+import { hostRoles, isRestricted, accessSummary, ROLE_META } from '@/lib/hostPolicy';
+import { ROLE_ICON, ROLE_HEX, usePolicyNames } from './policy';
 import { cn } from '@/lib/cn';
 import { HOST_STATUS_HEX, HOST_TRANSITIONAL, hostStatusLabel, hostUtil, gpuTotal, Led, utilColor } from './visuals';
 import type { BareMetalHost, Operation } from '@/types';
@@ -13,7 +15,7 @@ import type { BareMetalHost, Operation } from '@/types';
 export interface RackGhost { unit: number; sizeU: number; label?: string; conflict?: boolean }
 
 export function RackElevation({
-  name, hosts, units = 42, uHeight = 14, highlightId, onSelect, ghost, pickSizeU, onPickUnit, opsByHost, className, subtitle,
+  name, hosts, units = 42, uHeight = 14, highlightId, onSelect, ghost, pickSizeU, onPickUnit, opsByHost, className, subtitle, showRoles,
 }: {
   name: string;
   hosts: BareMetalHost[];
@@ -28,6 +30,8 @@ export function RackElevation({
   opsByHost?: Map<string, Operation>;
   className?: string;
   subtitle?: string;
+  /** draw a role marker (tiny role icons + lock for restricted hosts) on each faceplate */
+  showRoles?: boolean;
 }) {
   const [tip, setTip] = useState<{ h: BareMetalHost; x: number; y: number } | null>(null);
   const [hoverU, setHoverU] = useState<number | null>(null);
@@ -124,6 +128,7 @@ export function RackElevation({
                     <span className="flex min-w-0 items-center gap-1">
                       <span className={cn('truncate font-mono text-[9.5px] font-medium leading-none', off ? 'text-zinc-500' : 'text-zinc-100')}>{h.name}</span>
                       {gpus > 0 && <span className="shrink-0 rounded-[2px] bg-violet-500/80 px-[3px] font-mono text-[8px] font-semibold leading-[11px] text-white" title={`${gpus}× ${h.gpus.map((g) => g.model).join(', ')}`}>GPU×{gpus}</span>}
+                      {showRoles && <RoleMarker h={h} />}
                       {!tall && <MiniBar ratio={u.cpu} className="ml-auto w-8" />}
                     </span>
                     {tall && (
@@ -170,6 +175,17 @@ export function RackElevation({
   );
 }
 
+/** Tiny role icons (+ lock when restricted) drawn on a faceplate. */
+function RoleMarker({ h }: { h: BareMetalHost }) {
+  const roles = hostRoles(h);
+  return (
+    <span className="flex shrink-0 items-center gap-[2px]">
+      {roles.map((r) => { const Icon = ROLE_ICON[r]; return <span key={r} title={ROLE_META[r].label} className="flex size-[11px] items-center justify-center rounded-[2px]" style={{ background: `${ROLE_HEX[r]}cc` }}><Icon className="size-[8px] text-white" strokeWidth={2.5} /></span> })}
+      {isRestricted(h) && <Lock className="size-[10px] text-amber-400" strokeWidth={2.5} aria-label="Restricted" />}
+    </span>
+  );
+}
+
 function MiniBar({ ratio, label, className }: { ratio: number; label?: string; className?: string }) {
   return (
     <span className={cn('flex min-w-0 items-center gap-1', className)}>
@@ -187,6 +203,7 @@ function HostTooltip({ h, x, y, op }: { h: BareMetalHost; x: number; y: number; 
   const left = x + 16 + w > window.innerWidth ? x - w - 12 : x + 16;
   const top = Math.min(y + 12, window.innerHeight - 220);
   const color = HOST_STATUS_HEX[h.status] ?? '#94a3b8';
+  const { names } = usePolicyNames();
   return (
     <div className="pointer-events-none fixed z-[90] animate-in rounded-xl border border-line bg-surface p-3 text-xs shadow-pop" style={{ left: Math.max(8, left), top, width: w }}>
       <div className="flex items-center justify-between gap-2">
@@ -194,6 +211,8 @@ function HostTooltip({ h, x, y, op }: { h: BareMetalHost; x: number; y: number; 
         <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color }}><Led color={color} />{hostStatusLabel[h.status] ?? h.status}</span>
       </div>
       <div className="mt-0.5 truncate text-muted">{h.vendor} {h.model} · {h.rack} U{h.rackUnit}{h.sizeU > 1 ? `–${h.rackUnit + h.sizeU - 1}` : ''}</div>
+      <div className="mt-1 truncate text-[11px] text-fg-2">{hostRoles(h).map((r) => ROLE_META[r].short).join(' · ')}</div>
+      {isRestricted(h) && <div className="flex items-center gap-1 truncate text-[11px] text-amber-600 dark:text-amber-400"><Lock className="size-3 shrink-0" />{accessSummary(h, names)}</div>}
       {op && <div className="mt-1.5 truncate rounded-md bg-sky-500/10 px-1.5 py-1 text-[11px] text-sky-600 dark:text-sky-300">{op.title}…</div>}
       <div className="mt-2.5 space-y-1.5">
         <TipRow icon={<Cpu className="size-3" />} label="vCPU" value={`${u.a.vcpus} / ${u.cap.vcpus}`} ratio={u.cpu} />

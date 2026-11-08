@@ -242,7 +242,7 @@ function CorsEditor({ bucket: b }: { bucket: Bucket }) {
           render={(r, update, i) => (
             <div className="space-y-2">
               <div className="grid gap-2 @min-[40rem]:grid-cols-[minmax(0,1fr)_auto_130px]">
-                <Input value={r.origins} onChange={(e) => update({ origins: e.target.value })} placeholder="https://app.example.com, https://*.example.com" mono invalid={!!patch.errors[`cors.${i}.origins`]} />
+                <Input value={r.origins} onChange={(e) => update({ origins: e.target.value })} placeholder="https://www.regiocom-energie.de, https://*.regiocom-energie.de" mono invalid={!!patch.errors[`cors.${i}.origins`]} />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                   {METHOD_LIST.map((m) => <Checkbox key={m} checked={r.methods.includes(m)} onChange={(v) => update({ methods: v ? [...r.methods, m] : r.methods.filter((x) => x !== m) })} label={<span className="font-mono text-xs">{m}</span>} />)}
                 </div>

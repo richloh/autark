@@ -64,7 +64,11 @@ export function VmConsole(p: ConsoleProps) {
     if (/monitoring|prometheus/.test(vm.name)) { s.add('prometheus'); s.add('grafana-server') }
     if (/gitlab-runner/.test(vm.name)) s.add('gitlab-runner');
     if (/vpn/.test(vm.name)) s.add('wg-quick@wg0');
-    if (/db|postgres/.test(vm.name)) s.add('postgresql');
+    if (/hana/.test(vm.name)) s.add('sapinit');
+    else if (/db|postgres/.test(vm.name)) s.add('postgresql');
+    if (/^(isu|s4)-(app|ascs|webdispatcher)/.test(vm.name)) s.add('sapinit');
+    if (/^compass-app/.test(vm.name)) s.add('compass-app');
+    if (/^compass-billing/.test(vm.name)) s.add('compass-batch');
     if (/jupyter/.test(vm.name)) s.add('jupyterhub');
     if (vm.gpu) s.add('nvidia-persistenced');
     return s;
@@ -263,7 +267,7 @@ export function VmConsole(p: ConsoleProps) {
       }
       case 'cat': {
         const f = args[0] ?? '';
-        if (f === '/etc/os-release') out = [o(`PRETTY_NAME="${os.pretty}"`), o(`NAME="${os.pretty.split(' ')[0]}"`), o(`VERSION_ID="${os.versionId}"`), ...(os.codename ? [o(`VERSION_CODENAME=${os.codename}`)] : []), o(`ID=${os.id}`), ...(os.idLike ? [o(`ID_LIKE="${os.idLike}"`)] : []), o('HOME_URL="https://autark.example.com/images"')];
+        if (f === '/etc/os-release') out = [o(`PRETTY_NAME="${os.pretty}"`), o(`NAME="${os.pretty.split(' ')[0]}"`), o(`VERSION_ID="${os.versionId}"`), ...(os.codename ? [o(`VERSION_CODENAME=${os.codename}`)] : []), o(`ID=${os.id}`), ...(os.idLike ? [o(`ID_LIKE="${os.idLike}"`)] : []), o('HOME_URL="https://autark.regiocom-energie.de/images"')];
         else if (f === '/etc/hostname') out = [o(vm.name)];
         else if (f === '/etc/hosts') out = [o('127.0.0.1 localhost'), o(`${vm.privateIp} ${vm.name}.${vm.projectId}.internal ${vm.name}`), o('::1 ip6-localhost ip6-loopback')];
         else if (f === '/proc/loadavg') out = [o(`${loadStr.replace(/,/g, '')} 2/${180 + services.size * 6} ${4000 + (up / 1000) % 9000 | 0}`)];
@@ -310,7 +314,7 @@ export function VmConsole(p: ConsoleProps) {
         const u = unit === 'sshd' ? 'ssh' : unit;
         if (!services.has(u)) { out = [o(`Unit ${unit}.service could not be found.`, 'err')]; break }
         const since = new Date(Date.parse(vm.lastStartedAt ?? vm.createdAt) + 8000);
-        const desc: Record<string, string> = { nginx: 'A high performance web server and a reverse proxy server', ssh: 'OpenBSD Secure Shell server', docker: 'Docker Application Container Engine', 'qemu-guest-agent': 'QEMU Guest Agent', prometheus: 'Prometheus monitoring system', postgresql: 'PostgreSQL RDBMS', 'wg-quick@wg0': 'WireGuard via wg-quick(8) for wg0', 'gitlab-runner': 'GitLab Runner', k3s: 'Lightweight Kubernetes', jupyterhub: 'JupyterHub', cron: 'Regular background program processing daemon' };
+        const desc: Record<string, string> = { nginx: 'A high performance web server and a reverse proxy server', ssh: 'OpenBSD Secure Shell server', docker: 'Docker Application Container Engine', 'qemu-guest-agent': 'QEMU Guest Agent', prometheus: 'Prometheus monitoring system', postgresql: 'PostgreSQL RDBMS', 'wg-quick@wg0': 'WireGuard via wg-quick(8) for wg0', 'gitlab-runner': 'GitLab Runner', k3s: 'Lightweight Kubernetes', jupyterhub: 'JupyterHub', sapinit: 'SAP startup framework (sapstartsrv)', 'compass-app': 'Compass ERP application server', 'compass-batch': 'Compass billing batch worker', cron: 'Regular background program processing daemon' };
         const pid = 900 + (u.length * 37) % 400;
         out = [
           { k: 'ok', t: `● ${u}.service - ${desc[u] ?? u}` },
@@ -339,6 +343,9 @@ export function VmConsole(p: ConsoleProps) {
           ...(services.has('prometheus') ? [['prometh+', 'prometheus', 11.4, 18.2] as [string, string, number, number]] : []),
           ...(services.has('postgresql') ? [['postgres', 'postgres', 8.4, 22.0] as [string, string, number, number]] : []),
           ...(services.has('gitlab-runner') ? [['gitlab-+', 'gitlab-runner', 4.0, 1.2] as [string, string, number, number]] : []),
+          ...(services.has('sapinit') ? (/hana/.test(vm.name) ? [['ip1adm', 'hdbindexserver', 24.6, 71.3], ['ip1adm', 'hdbnameserver', 1.8, 2.1]] as [string, string, number, number][] : [['ip1adm', 'disp+work', 6.2, 9.8], ['ip1adm', 'sapstartsrv', 0.3, 0.2]] as [string, string, number, number][]) : []),
+          ...(services.has('compass-app') ? [['compass', 'java -jar compass-app.jar', 14.2, 38.5] as [string, string, number, number]] : []),
+          ...(services.has('compass-batch') ? [['compass', 'java -jar compass-billing.jar --run=turnus', 71.0, 54.2] as [string, string, number, number]] : []),
           ...(vm.gpu ? [[user, 'python3 train.py', 86.0, 31.5] as [string, string, number, number]] : []),
           ...(services.has('jupyterhub') ? [['jupyter', 'jupyterhub', 2.6, 3.4] as [string, string, number, number]] : []),
           ['root', 'qemu-ga', 0.3, 0.1], ['root', 'systemd-journald', 0.2, 0.3], ['root', 'sshd', 0.0, 0.1], ['root', 'cron', 0.0, 0.0], [user, '-bash', 0.0, 0.0],

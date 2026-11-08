@@ -1,3 +1,4 @@
+import { usePro } from '@/store/ui';
 import { useMemo } from 'react';
 import { Link } from 'react-router';
 import { ChevronDown, MapPin } from 'lucide-react';
@@ -58,6 +59,7 @@ export function shortName(l: Location) {
 
 /** Counts per resource type, optionally narrowed to one location. */
 export function InventoryGrid({ fleet, locationId }: { fleet: Fleet; locationId: string | null }) {
+  const pro = usePro();
   const { items: firewalls } = useList<Firewall>('firewalls');
   const { items: zones } = useList<DnsZone>('dnsZones');
   const { items: pools } = useList<IpPool>('ipPools');
@@ -86,9 +88,9 @@ export function InventoryGrid({ fleet, locationId }: { fleet: Fleet; locationId:
       { kind: 'k8s', label: 'Kubernetes', to: '/managed-services/kubernetes', count: k8s.length, alert: bad(k8s) },
       { kind: 'bucket', label: 'Buckets', to: '/managed-services/object-storage', count: at(fleet.buckets).length },
       { kind: 'lb', label: 'Load balancers', to: '/managed-services/load-balancers', count: lbs.length, alert: bad(lbs) },
-      { kind: 'bareMetal', label: 'Bare-metal hosts', to: '/hardware/bare-metals', count: hosts.length, alert: bad(hosts) },
+      ...(pro ? [{ kind: 'bareMetal' as const, label: 'Bare-metal hosts', to: '/hardware/bare-metals', count: hosts.length, alert: bad(hosts) }] : []),
     ];
-  }, [fleet, locationId, firewalls, zones, pools]);
+  }, [fleet, locationId, firewalls, zones, pools, pro]);
 
   return (
     <div className="@container">

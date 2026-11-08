@@ -55,7 +55,7 @@ export default function K8sCreate() {
   useAutoSubnet(projectId, locationId, net, setNet);
   const [addons, setAddons] = useState<Record<string, boolean>>({ ingress: true, certManager: true, metricsServer: true, monitoring: true });
   const [oidc, setOidc] = useState(false);
-  const [oidcConfig, setOidcConfig] = useState({ issuerUrl: 'https://sso.example.com/realms/autark', clientId: 'kubernetes', usernameClaim: 'email', groupsClaim: 'groups' });
+  const [oidcConfig, setOidcConfig] = useState({ issuerUrl: 'https://sso.regiocom-energie.de/realms/regiocom', clientId: 'kubernetes', usernameClaim: 'email', groupsClaim: 'groups' });
   const [protection, setProtection] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -120,7 +120,7 @@ export default function K8sCreate() {
   ].join('\n');
 
   const nameField = (
-    <Field label="Cluster name" required error={nameErr} hint={pro ? 'e.g. prod-eu, ml-platform' : undefined}>
+    <Field label="Cluster name" required error={nameErr} hint={pro ? 'e.g. orchestrator-prod, tools' : undefined}>
       <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="prod-eu" invalid={!!nameErr} autoFocus />
     </Field>
   );
@@ -252,7 +252,7 @@ export default function K8sCreate() {
         icon={Boxes} iconColor="#326ce5" crumbs={[{ label: 'Kubernetes', to: '/managed-services/kubernetes' }, { label: 'Create' }]} />
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
 
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="Kubernetes cluster" aside={<>
         <CostPanel cost={cost} projectId={projectId} footer={
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" icon={Rocket} loading={create.isPending} disabled={!canSubmit} onClick={() => create.mutate()}>Create cluster</Button>

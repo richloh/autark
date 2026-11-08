@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowRight, Wrench, Play, Ban, RotateCw, HeartPulse, Download, Power, PowerOff, Trash2, RefreshCcw, Cpu as CpuIcon, AlertTriangle, CheckCircle2, MoveRight } from 'lucide-react';
+import { ArrowRight, Wrench, Play, Ban, RotateCw, HeartPulse, Download, Power, PowerOff, Trash2, RefreshCcw, Cpu as CpuIcon, AlertTriangle, CheckCircle2, MoveRight, Scale } from 'lucide-react';
 import { api } from '@/api/client';
 import { useApiMutation, useGet } from '@/api/hooks';
 import { Modal, confirm } from '@/components/ui/Modal';
@@ -60,6 +60,7 @@ export function useHostActions() {
     const list: MenuItem[] = [];
     if (st === 'maintenance') list.push({ label: 'Exit maintenance', icon: Play, onClick: () => act(h, 'exitMaintenance', `Returning ${h.name} to service`) });
     else list.push({ label: 'Enter maintenance…', icon: Wrench, disabled: !['ready', 'draining', 'error'].includes(st), onClick: () => setMaint(h), hint: h.allocated?.vms ? `${h.allocated.vms} VMs` : undefined });
+    list.push({ label: 'Roles & availability…', icon: Scale, to: `/hardware/bare-metals/${h.id}?tab=policy` });
     if (st === 'draining') list.push({ label: 'Uncordon', icon: Play, onClick: () => act(h, 'exitMaintenance', `${h.name} accepts new VMs again`) });
     else list.push({ label: 'Cordon (no new VMs)', icon: Ban, disabled: st !== 'ready', onClick: () => act(h, 'drain', `${h.name} cordoned — no new VMs will be scheduled`) });
     list.push(

@@ -187,7 +187,7 @@ function ImportExport({ zone, onDownload }: { zone: DnsZone; onDownload: () => v
         <CardHeader title="Import zone file" description="BIND format. SOA is ignored; apex NS stays managed by Autark." icon={Upload}
           actions={<Button size="xs" variant="ghost" onClick={() => setText(SAMPLE(zone.name))}>Load sample</Button>} />
         <CardBody className="space-y-3">
-          <Textarea mono rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder={'$ORIGIN example.com.\n$TTL 3600\n@ IN A 203.0.113.10\nwww IN CNAME @'} />
+          <Textarea mono rows={14} value={text} onChange={(e) => setText(e.target.value)} placeholder={'$ORIGIN regiocom-energie.de.\n$TTL 3600\n@ IN A 203.0.113.10\nwww IN CNAME @'} />
           <div className="flex flex-wrap items-center gap-3">
             <label className="cursor-pointer text-xs font-medium text-brand-500 hover:underline">
               <input type="file" accept=".zone,.txt,.db,text/plain" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />

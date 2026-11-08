@@ -203,8 +203,8 @@ export function IssueCertificateModal({ open, onClose, defaultProjectId, onCreat
             <ProjectField value={projectId} onChange={setProjectId} error={errors.projectId} />
           </div>
         ) : <Field label="Name" required error={errors.name}><Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="example-com" invalid={!!errors.name} /></Field>}
-        <Field label="Domains" required error={errors.domains} hint={pro ? 'Separate with spaces, commas or new lines. The first name becomes the subject; all names are SANs.' : 'Separate with commas, e.g. example.com, www.example.com'}>
-          <Textarea rows={2} mono value={domainsText} onChange={(e) => setDomainsText(e.target.value)} placeholder="example.com, www.example.com" invalid={!!errors.domains} />
+        <Field label="Domains" required error={errors.domains} hint={pro ? 'Separate with spaces, commas or new lines. The first name becomes the subject; all names are SANs.' : 'Separate with commas, e.g. regiocom-energie.de, www.regiocom-energie.de'}>
+          <Textarea rows={2} mono value={domainsText} onChange={(e) => setDomainsText(e.target.value)} placeholder="regiocom-energie.de, www.regiocom-energie.de" invalid={!!errors.domains} />
         </Field>
         {domains.length > 0 && <div className="flex flex-wrap gap-1">{domains.map((d) => <Badge key={d} tone={d.startsWith('*.') ? 'violet' : 'neutral'}>{d}</Badge>)}</div>}
 
@@ -214,7 +214,7 @@ export function IssueCertificateModal({ open, onClose, defaultProjectId, onCreat
             <Field label="Domain validation (ACME challenge)">
               <OptionCards cols={2} value={effChallenge} onChange={(v) => setChallenge(v)} options={[
                 { value: 'http-01', title: 'HTTP-01', icon: <Globe2 className="size-4 text-brand-500" />, disabled: wildcard, description: 'Let\'s Encrypt fetches a token from http://<domain>/.well-known/acme-challenge/ — your load balancers answer automatically. The domain must already point at an Autark LB. No wildcards.' },
-                { value: 'dns-01', title: 'DNS-01', icon: <AtSign className="size-4 text-cyan-500" />, description: 'Autark writes a _acme-challenge TXT record into your managed DNS zone. Works before traffic is pointed here and supports wildcards (*.example.com).' },
+                { value: 'dns-01', title: 'DNS-01', icon: <AtSign className="size-4 text-cyan-500" />, description: 'Autark writes a _acme-challenge TXT record into your managed DNS zone. Works before traffic is pointed here and supports wildcards (*.regiocom-energie.de).' },
               ]} />
             </Field>
             {wildcard && <Hint>Wildcard names can only be validated with <b>DNS-01</b>.</Hint>}

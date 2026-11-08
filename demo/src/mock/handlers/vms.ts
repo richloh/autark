@@ -5,8 +5,9 @@ import { registerMetrics } from '../metrics';
 import { vmCost } from '@/lib/pricing';
 import {
   pickHost, checkHostFits, rankHosts, locationOrThrow, checkQuota, checkRequiredTags, checkLocationAllowed, allocateIp, defaultPool, assignIp, unassignIp,
-  setFirewalls, attachVolume, detachVolume, nextPrivateIp, hostAllocation, hostCapacity,
+  setFirewalls, attachVolume, detachVolume, nextPrivateIp, hostAllocation, hostCapacity, workloadFor, policyNames,
 } from './shared';
+import { policyReason } from '@/lib/hostPolicy';
 import type { VM, VmPreset, Image, Network, Volume, IpAddress, BareMetalHost, Snapshot, Location, PlacementCandidate } from '@/types';
 
 /* Virtual machines — the reference implementation for a fully featured resource. */
@@ -95,7 +96,8 @@ export function createVm(ctx: Ctx, body: any): VM {
   let host: BareMetalHost | null = null;
   if (loc.kind === 'selfHosted') {
     const need = { vcpus: size.vcpus, ramGB: size.ramGB, gpus: size.gpu?.count ?? 0, gpuModel: size.gpu?.model };
-    host = body.hostId ? checkHostFits(body.hostId, loc.id, need) : pickHost(loc.id, need);
+    const wl = workloadFor(sc.projectId, 'compute', sc.accountId);
+    host = body.hostId ? checkHostFits(body.hostId, loc.id, need, wl) : pickHost(loc.id, need, undefined, wl);
   }
 
   const id = newId('vm');
@@ -187,7 +189,8 @@ function requireStatus(vm: VM, allowed: VM['status'][], verb: string) {
 }
 
 /** Dry-run placement: which host would the scheduler pick, and how would it look afterwards? */
-function placementPreview(q: URLSearchParams) {
+function placementPreview(ctx: Ctx) {
+  const q = ctx.query;
   const locationId = q.get('locationId') ?? '';
   const loc = db.get<Location>('locations', locationId);
   if (!loc) throw new ApiError(422, 'Unknown location', 'validation_failed');
@@ -196,23 +199,27 @@ function placementPreview(q: URLSearchParams) {
     const prov = loc.providerId ? db.get<any>('providers', loc.providerId) : null;
     return { kind: 'cloud', location: { id: loc.id, name: loc.name, city: loc.city, country: loc.country }, provider: prov ? { id: prov.id, name: prov.name, status: prov.status } : null, need };
   }
-  const ranked = rankHosts(loc.id, need);
+  const projectId = q.get('projectId') || ctx.scope.projectId || null;
+  const wl = workloadFor(projectId, 'compute');
+  const ranked = rankHosts(loc.id, need, undefined, wl);
   const pinned = q.get('hostId');
   const chosen = pinned ? ranked.find((c) => c.host.id === pinned) : ranked.find((c) => c.fits);
   const view = (c: (typeof ranked)[number]) => ({
     id: c.host.id, name: c.host.name, rack: c.host.rack, rackUnit: c.host.rackUnit, model: `${c.host.vendor} ${c.host.model}`, status: c.host.status,
-    gpus: c.host.gpus, fits: c.fits, reason: c.reason, capacity: c.cap, used: c.used,
+    gpus: c.host.gpus, fits: c.fits, reason: c.reason, excluded: c.excluded, dedicated: c.dedicated, capacity: c.cap, used: c.used,
     free: { vcpus: c.cap.vcpus - c.used.vcpus, ramGB: c.cap.ramGB - c.used.ramGB, gpus: c.cap.gpus - c.used.gpus },
   });
   const why = !chosen ? null : pinned ? 'Pinned by you'
+    : chosen.dedicated ? `Dedicated to ${projectId ? policyNames.project(projectId) : 'this project'} — reserved hosts are used first`
     : need.gpus > 0 ? `Has ${chosen.cap.gpus - chosen.used.gpus} free GPU${chosen.cap.gpus - chosen.used.gpus === 1 ? '' : 's'} and the most free memory`
     : chosen.cap.gpus === 0 && ranked.some((c) => c.fits && c.cap.gpus > 0) ? 'Most free memory (GPU hosts are kept free for GPU workloads)'
     : 'Most free memory among hosts that fit';
-  return { kind: 'selfHosted', location: { id: loc.id, name: loc.name, city: loc.city, country: loc.country }, need, mode: pinned ? 'manual' : 'auto', chosen: chosen ? view(chosen) : null, why, candidates: ranked.map(view) };
+  const excluded = { role: ranked.filter((c) => c.excluded === 'role').length, access: ranked.filter((c) => c.excluded === 'access').length };
+  return { kind: 'selfHosted', location: { id: loc.id, name: loc.name, city: loc.city, country: loc.country }, need, projectId, mode: pinned ? 'manual' : 'auto', chosen: chosen ? view(chosen) : null, why, excluded, candidates: ranked.map(view) };
 }
 
 export function registerVms() {
-  route('GET', '/vms/placement-preview', (ctx) => placementPreview(ctx.query), 'Dry-run scheduler: which host a VM of a given size would be placed on (?locationId&vcpus&ramGB&gpus&gpuModel&hostId)');
+  route('GET', '/vms/placement-preview', (ctx) => placementPreview(ctx), 'Dry-run scheduler: which host a VM of a given size would be placed on, honouring host roles & access (?locationId&projectId&vcpus&ramGB&gpus&gpuModel&hostId)');
 
   defineCollection<VM>({
     name: 'vms', kind: 'vm', idPrefix: 'vm',
@@ -294,9 +301,11 @@ export function registerVms() {
       migrate: (ctx, vm, body) => {
         requireStatus(vm, ['running', 'stopped'], 'migrate');
         if (!vm.hostId) throw new ApiError(409, 'Only VMs on self-hosted hardware can be migrated', 'invalid_state');
-        const target = body.hostId ? getOr404<BareMetalHost>('hosts', body.hostId, 'Host') : pickHost(vm.locationId, { vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0, gpuModel: vm.gpu?.model }, vm.hostId);
-        if (target.id === vm.hostId) throw new ApiError(422, 'VM already runs on that host', 'validation_failed');
-        if (target.locationId !== vm.locationId) throw new ApiError(422, 'Live migration is only possible within a location', 'validation_failed');
+        if (body.hostId && body.hostId === vm.hostId) throw new ApiError(422, 'VM already runs on that host', 'validation_failed');
+        if (body.hostId && getOr404<BareMetalHost>('hosts', body.hostId, 'Host').locationId !== vm.locationId) throw new ApiError(422, 'Live migration is only possible within a location', 'validation_failed');
+        const need = { vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0, gpuModel: vm.gpu?.model };
+        const wl = workloadFor(vm.projectId, 'compute', vm.accountId);
+        const target = body.hostId ? checkHostFits(body.hostId, vm.locationId, need, wl) : pickHost(vm.locationId, need, vm.hostId, wl);
         const live = vm.status === 'running';
         const from = db.get<BareMetalHost>('hosts', vm.hostId)?.name ?? vm.hostId;
         vmOp(ctx, vm, 'vm.migrate', `${live ? 'Live-migrate' : 'Migrate'} ${vm.name} → ${target.name}`, 'migrating', [
@@ -386,19 +395,21 @@ export function registerVms() {
     const vm = getOr404<VM>('vms', ctx.params.id, 'VM');
     if (vm.accountId !== ctx.scope.accountId) throw new ApiError(404, 'VM not found', 'not_found');
     const hosts = db.filter<BareMetalHost>('hosts', (h) => h.locationId === vm.locationId && h.hypervisor === 'KVM');
+    const wl = workloadFor(vm.projectId, 'compute', vm.accountId);
     const items: PlacementCandidate[] = hosts.map((h) => {
       const cap = hostCapacity(h); const used = hostAllocation(h.id);
       const current = h.id === vm.hostId;
       const needCpu = current ? 0 : vm.size.vcpus, needRam = current ? 0 : vm.size.ramGB, needGpu = current ? 0 : vm.gpu?.count ?? 0;
-      let reason: string | undefined;
-      if (h.status !== 'ready') reason = `Host is ${h.status}`;
+      let reason: string | undefined = policyReason(h, wl, policyNames) ?? undefined;
+      if (reason) { /* excluded by host policy */ }
+      else if (h.status !== 'ready') reason = `Host is ${h.status}`;
       else if (cap.vcpus - used.vcpus < needCpu) reason = `Only ${cap.vcpus - used.vcpus} vCPU free`;
       else if (cap.ramGB - used.ramGB < needRam) reason = `Only ${cap.ramGB - used.ramGB} GB RAM free`;
       else if (needGpu && (cap.gpus - used.gpus < needGpu || !h.gpus.some((g) => g.model === vm.gpu?.model))) reason = `No free ${vm.gpu?.model} GPU`;
       return {
         id: h.id, name: h.name, locationId: h.locationId, rack: h.rack, status: h.status, cpuModel: h.cpuModel,
         capacity: { vcpus: cap.vcpus, ramGB: cap.ramGB, gpus: cap.gpus }, allocated: { vcpus: used.vcpus, ramGB: used.ramGB, gpus: used.gpus, vms: used.vms },
-        current, fits: !current && !reason, reason: current ? 'Current host' : reason,
+        current, fits: !current && !reason, reason: current ? (reason ? `Current host · ${reason}` : 'Current host') : reason,
       };
     }).sort((a, b) => Number(b.current) - Number(a.current) || Number(b.fits) - Number(a.fits) || (b.capacity.ramGB - b.allocated.ramGB) - (a.capacity.ramGB - a.allocated.ramGB));
     return { items, vm: { id: vm.id, vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0 } };

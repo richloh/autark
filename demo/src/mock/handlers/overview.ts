@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { route } from '../framework';
 import { hostAllocation, hostCapacity } from './shared';
+import { hostRoles } from '@/lib/hostPolicy';
 import type { BareMetalHost } from '@/types';
 
 /* Read-only aggregates for the dashboard. Capacity is fleet-wide (hosts are shared by all accounts),
@@ -21,7 +22,7 @@ export function registerOverview() {
       else if (h.status === 'maintenance' || h.status === 'draining') l.hosts.maintenance++;
       else if (h.status === 'offline' || h.status === 'error') l.hosts.offline++;
       else l.hosts.other++;
-      if (h.status === 'ready' || h.status === 'draining' || h.status === 'maintenance') {
+      if ((h.status === 'ready' || h.status === 'draining' || h.status === 'maintenance') && hostRoles(h).includes('compute')) {
         const c = hostCapacity(h);
         l.capacity.vcpus += c.vcpus; l.capacity.ramGB += c.ramGB; l.capacity.gpus += c.gpus;
       }

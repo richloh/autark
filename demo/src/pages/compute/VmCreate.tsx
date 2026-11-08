@@ -145,7 +145,7 @@ export default function VmCreate() {
   });
 
   const nameErr = name && !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(name) ? 'Lowercase letters, digits and dashes' : undefined;
-  const { data: placementData } = usePlacement({ locationId, vcpus: size.vcpus, ramGB: size.ramGB, gpu: size.gpu, hostId: placement === 'manual' ? hostId : undefined });
+  const { data: placementData } = usePlacement({ locationId, vcpus: size.vcpus, ramGB: size.ramGB, gpu: size.gpu, hostId: placement === 'manual' ? hostId : undefined, projectId: projectId || undefined });
   const placementBlocked = placementData?.kind === 'selfHosted' && (!placementData.chosen || !placementData.chosen.fits);
   const canSubmit = !!name && !nameErr && !!projectId && !!net.subnetId && (image?.os === 'windows' || sshKeyIds.length > 0) && !placementBlocked;
 
@@ -161,8 +161,8 @@ export default function VmCreate() {
   /* ------------------------------------------------------------ building blocks (shared by both modes) */
 
   const nameField = (
-    <Field label="Name" required error={nameErr ?? errors.name} hint={count > 1 ? `Creates ${name || 'name'}-1 … ${name || 'name'}-${count}` : 'e.g. web-4, api-staging'}>
-      <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="web-4" invalid={!!(nameErr ?? errors.name)} autoFocus={pro} />
+    <Field label="Name" required error={nameErr ?? errors.name} hint={count > 1 ? `Creates ${name || 'name'}-1 … ${name || 'name'}-${count}` : 'e.g. compass-app-4, website-web-3'}>
+      <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="compass-app-4" invalid={!!(nameErr ?? errors.name)} autoFocus={pro} />
     </Field>
   );
   const projectField = <ProjectField value={projectId} onChange={setProjectId} error={errors.projectId} />;
@@ -290,7 +290,7 @@ export default function VmCreate() {
   );
 
   const placementField = loc?.kind === 'selfHosted' ? (
-    <PlacementOverride locationId={locationId} vcpus={size.vcpus} ramGB={size.ramGB} gpu={size.gpu} mode={placement} hostId={hostId}
+    <PlacementOverride locationId={locationId} projectId={projectId || undefined} vcpus={size.vcpus} ramGB={size.ramGB} gpu={size.gpu} mode={placement} hostId={hostId}
       onMode={(m) => { setPlacement(m); if (m === 'auto') setHostId('') }} onHost={setHostId} />
   ) : <p className="text-[13px] text-muted">In cloud regions the provider picks the physical server.</p>;
 
@@ -315,7 +315,7 @@ export default function VmCreate() {
       />
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
 
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="server" aside={<>
         <CostPanel cost={cost} projectId={projectId} quantity={count} footer={
           <div className="space-y-2">
             <Button variant="primary" size="lg" className="w-full" icon={Rocket} loading={create.isPending} disabled={!canSubmit} onClick={() => create.mutate()}>
@@ -330,7 +330,7 @@ export default function VmCreate() {
             <div className="flex justify-between gap-2"><span>Size</span><span className="truncate text-fg-2">{size.vcpus} vCPU · {size.ramGB} GB{size.gpu ? ` · ${size.gpu.count}× ${size.gpu.model}` : ''}</span></div>
           </div>
         </CostPanel>
-        <PlacementPreview locationId={locationId} vcpus={size.vcpus} ramGB={size.ramGB} gpu={size.gpu} hostId={placement === 'manual' ? hostId : undefined}
+        <PlacementPreview locationId={locationId} projectId={projectId || undefined} vcpus={size.vcpus} ramGB={size.ramGB} gpu={size.gpu} hostId={placement === 'manual' ? hostId : undefined}
           onChangeHost={() => { setPlacement('manual'); setAdvOpen(true); setTimeout(() => document.getElementById('placement-override')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80) }} />
         {pro && (
           <details className="group rounded-xl border border-line bg-surface p-4 shadow-card">
@@ -434,11 +434,11 @@ function AdvancedGroup({ title, children }: { title: string; children: ReactNode
 }
 
 /** Manual placement override: automatic scheduling or pin to a specific host (only hosts that fit are selectable). */
-function PlacementOverride({ locationId, vcpus, ramGB, gpu, mode, hostId, onMode, onHost }: {
-  locationId: string; vcpus: number; ramGB: number; gpu: { model: string; count: number } | null; mode: 'auto' | 'manual'; hostId: string;
+function PlacementOverride({ locationId, projectId, vcpus, ramGB, gpu, mode, hostId, onMode, onHost }: {
+  locationId: string; projectId?: string; vcpus: number; ramGB: number; gpu: { model: string; count: number } | null; mode: 'auto' | 'manual'; hostId: string;
   onMode: (m: 'auto' | 'manual') => void; onHost: (id: string) => void;
 }) {
-  const { data } = usePlacement({ locationId, vcpus, ramGB, gpu });
+  const { data } = usePlacement({ locationId, vcpus, ramGB, gpu, projectId });
   const cands = data?.candidates ?? [];
   const auto = data?.chosen;
   useEffect(() => { if (mode === 'manual' && !hostId && auto) onHost(auto.id) }, [mode, hostId, auto?.id]); // eslint-disable-line

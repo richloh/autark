@@ -101,7 +101,7 @@ export function toCli(cmd: string, body: Record<string, unknown>): string {
 
 export function toCurl(method: string, path: string, body?: unknown): string {
   return [
-    `curl -X ${method} https://autark.example.com/api/v1${path} \\`,
+    `curl -X ${method} https://autark.regiocom-energie.de/api/v1${path} \\`,
     `  -H "Authorization: Bearer $AUTARK_TOKEN" \\`,
     `  -H "Content-Type: application/json"${body ? ' \\' : ''}`,
     ...(body ? [`  -d '${JSON.stringify(body, null, 2).split('\n').join('\n  ')}'`] : []),

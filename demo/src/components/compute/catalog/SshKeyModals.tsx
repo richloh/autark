@@ -90,7 +90,7 @@ export function AddSshKeyModal({ open, onClose }: { open: boolean; onClose: () =
         )}
 
         <Field label="Name" required error={errors.name} hint="Defaults to the key comment. Lowercase, digits and dashes.">
-          <Input value={name} onChange={(e) => { setName(e.target.value.toLowerCase()); setNameTouched(true) }} placeholder="alice-laptop" invalid={!!errors.name} />
+          <Input value={name} onChange={(e) => { setName(e.target.value.toLowerCase()); setNameTouched(true) }} placeholder="dennis-laptop" invalid={!!errors.name} />
         </Field>
 
         <details className="group rounded-xl border border-line p-3">

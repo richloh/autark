@@ -107,7 +107,7 @@ export default function FirewallCreate() {
       <PageHeader title="Create firewall" description={pro ? 'Group rules once, attach them to many resources. Rules are evaluated by priority — the first match wins.' : 'Choose which incoming traffic is allowed. Everything else is blocked.'} icon={Shield} iconColor="#f97316"
         crumbs={[{ label: 'Firewalls', to: '/infrastructure/firewalls' }, { label: 'Create' }]} />
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
-      <CreateLayout aside={<>
+      <CreateLayout needsProject="firewall" aside={<>
         <div className="rounded-xl border border-line bg-surface p-4 shadow-card">
           <Pro>
             <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg"><ShieldCheck className="size-4 text-muted" /> Exposure check</div>

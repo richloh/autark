@@ -443,7 +443,7 @@ function registerIps() {
         poolId: !pool && (body.poolId ? 'Unknown IP pool' : body.locationId ? `No IPv${version} pool in ${body.locationId}` : 'Choose a location or pool'),
         name: body.name ? nameError(body.name) : null,
         address: pool && body.address ? requestedAddressError(pool, String(body.address).trim()) : null,
-        reverseDns: body.reverseDns && !hostnameOk(body.reverseDns) && 'Reverse DNS must be a hostname, e.g. web.example.com',
+        reverseDns: body.reverseDns && !hostnameOk(body.reverseDns) && 'Reverse DNS must be a hostname, e.g. web.regiocom-energie.de',
         assignTo: ipTargetError(sc.projectId, pool, body.assignTo),
       });
       checkLocationAllowed(sc.projectId, pool!.locationId);
@@ -458,7 +458,7 @@ function registerIps() {
       const next: IpAddress = { ...ip };
       if ('name' in patch) { validate({ name: patch.name ? nameError(patch.name) : null }); next.name = patch.name || undefined }
       if ('tags' in patch) next.tags = patch.tags ?? [];
-      if ('reverseDns' in patch) { validate({ reverseDns: patch.reverseDns && !hostnameOk(patch.reverseDns) && 'Reverse DNS must be a hostname, e.g. web.example.com' }); next.reverseDns = patch.reverseDns || null }
+      if ('reverseDns' in patch) { validate({ reverseDns: patch.reverseDns && !hostnameOk(patch.reverseDns) && 'Reverse DNS must be a hostname, e.g. web.regiocom-energie.de' }); next.reverseDns = patch.reverseDns || null }
       return next;
     },
     remove: (_ctx, ip) => {
@@ -482,7 +482,7 @@ function registerIps() {
       },
       setReverseDns: (_ctx, ip, body) => {
         const v = String(body.reverseDns ?? '').trim();
-        validate({ reverseDns: v && !hostnameOk(v) && 'Reverse DNS must be a hostname, e.g. web.example.com' });
+        validate({ reverseDns: v && !hostnameOk(v) && 'Reverse DNS must be a hostname, e.g. web.regiocom-energie.de' });
         db.update('ips', ip.id, { reverseDns: v || null } as any);
       },
     },
@@ -740,7 +740,7 @@ function normalizeRecord(zone: DnsZone, input: any, exceptId?: string): DnsRecor
     case 'AAAA': errs.value = !isValidIpv6(value) && 'AAAA records need an IPv6 address, e.g. 2001:db8::10'; break;
     case 'CNAME': case 'NS': case 'PTR':
       value = fqdnValue(value);
-      errs.value = !hostnameOk(value) && `${type} target must be a hostname, e.g. host.example.com.`;
+      errs.value = !hostnameOk(value) && `${type} target must be a hostname, e.g. host.regiocom-energie.de.`;
       if (type === 'CNAME' && name === '@') errs.name = 'CNAME is not allowed at the zone apex (use A/AAAA or ALIAS via a load balancer)';
       break;
     case 'MX':
@@ -757,7 +757,7 @@ function normalizeRecord(zone: DnsZone, input: any, exceptId?: string): DnsRecor
       if (parts.length === 4) { priority = priority ?? Number(parts[0]); parts.shift() }
       const [w, port, target] = parts;
       const ok = parts.length === 3 && intIn(Number(w), 0, 65535) && intIn(Number(port), 1, 65535) && hostnameOk(target ?? '');
-      errs.value = !ok && 'SRV value is "weight port target", e.g. 10 5060 sip.example.com.';
+      errs.value = !ok && 'SRV value is "weight port target", e.g. 10 5060 sip.regiocom-energie.de.';
       errs.priority = !(priority != null && intIn(priority, 0, 65535)) && 'SRV priority 0–65535 is required';
       if (!/^_[a-z0-9-]+\._(tcp|udp|tls)(\.|$)/.test(name)) errs.name = 'SRV names look like _service._tcp (e.g. _sip._tcp)';
       if (ok) value = `${Number(w)} ${Number(port)} ${fqdnValue(target)}`;
@@ -885,7 +885,7 @@ function registerDns() {
       const net = body.networkId ? db.get<Network>('networks', body.networkId) : undefined;
       const ttl = body.defaultTtl ?? 3600;
       validate({
-        name: !name ? 'Domain is required' : !ZONE_RE.test(name) ? 'Enter a domain like example.com or app.internal' :
+        name: !name ? 'Domain is required' : !ZONE_RE.test(name) ? 'Enter a domain like regiocom-energie.de or app.internal' :
           kind === 'public' ? (db.find<DnsZone>('dnsZones', (z) => z.kind === 'public' && z.name === name) && `${name} is already hosted on this platform`) :
             (db.find<DnsZone>('dnsZones', (z) => z.kind === 'private' && z.name === name && z.networkId === body.networkId) && `${name} already exists in that VPC`),
         networkId: kind === 'private' && (!net ? 'Private zones must be bound to a VPC' : net.projectId !== sc.projectId && 'VPC belongs to another project'),

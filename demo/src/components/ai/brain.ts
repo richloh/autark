@@ -61,10 +61,10 @@ export function suggestionsFor(ctx: PageContext): string[] {
   }
   if (ctx.listKind) {
     const p = KINDS[ctx.listKind].plural.toLowerCase();
-    return [`Which ${p} need attention?`, `Summarize my ${p}`, 'Where is my money going?', 'Spin up a VM like web-1'];
+    return [`Which ${p} need attention?`, `Summarize my ${p}`, 'Where is my money going?', 'Spin up a VM like compass-app-1'];
   }
   if (ctx.path.startsWith('/billing')) return ['Where is my money going?', 'How do we compare to a hyperscaler?', 'Which projects are close to budget?'];
-  return ['Any issues I should look at?', 'Where is my money going?', 'Summarize my infrastructure', 'Spin up a VM like web-1'];
+  return ['Any issues I should look at?', 'Where is my money going?', 'Summarize my infrastructure', 'Spin up a VM like compass-app-1'];
 }
 
 const t0 = () => performance.now();
@@ -89,7 +89,7 @@ export async function respond(prompt: string, ctx: PageContext): Promise<Part[]>
       return await costs(q, parts);
     }
     if (/(issue|problem|wrong|health|attention|broken|alert|degraded|error)/.test(q)) return await issues(parts);
-    if (/(create|spin up|launch|provision|new vm|like web)/.test(q)) return await createLike(q, parts);
+    if (/(create|spin up|launch|provision|new vm|vm like)/.test(q)) return await createLike(q, parts);
     if (/(summar|overview|what do i have|inventory)/.test(q)) return await summary(ctx, parts);
   } catch (e) {
     parts.push({ type: 'text', md: `I couldn't reach the control plane: ${(e as Error).message}` });
@@ -156,14 +156,16 @@ async function summary(ctx: PageContext, parts: Part[]): Promise<Part[]> {
 }
 
 async function createLike(q: string, parts: Part[]): Promise<Part[]> {
-  const vms = await tool<{ items: any[] }>('list_vms', '/vms?name=web-1', (r) => `${r.items.length} match`, parts);
+  const want = q.match(/like ([a-z0-9][\w-]*)/i)?.[1]?.toLowerCase() ?? 'compass-app-1';
+  const vms = await tool<{ items: any[] }>('list_vms', `/vms?name=${encodeURIComponent(want)}`, (r) => `${r.items.length} match`, parts);
   const ref = vms.items[0];
   const all = await tool<{ items: any[] }>('list_vms', '/vms', (r) => `${r.items.length} VMs`, parts);
-  let n = 4;
-  while (all.items.some((v) => v.name === `web-${n}`)) n++;
-  const name = `web-${n}`;
-  parts.push({ type: 'text', md: ref ? `I'll clone the shape of ${link('vm', ref.id, ref.name)}: **${ref.size.vcpus} vCPU · ${ref.size.ramGB} GB**, same image, network and firewalls, placed on the least-loaded host in **${ref.locationId}**. Estimated **${money(ref.monthlyCost)}**/mo.` : `I'll prepare a general-purpose VM (4 vCPU · 8 GB) in dc1.` });
-  parts.push({ type: 'action', title: `Create VM ${name}`, lines: [`+ vm ${name} (${ref?.size.vcpus ?? 4} vCPU / ${ref?.size.ramGB ?? 8} GB)`, `+ public IPv4 from ${ref?.locationId ?? 'dc1'} pool`, `~ firewall web-allow: attach ${name}`], cta: 'Open prefilled form', to: `/infrastructure/vms/new?name=${name}&location=${ref?.locationId ?? 'dc1'}`, risk: 'low' });
+  const base = (ref?.name ?? 'app').replace(/-\d+$/, '');
+  let n = 1;
+  while (all.items.some((v) => v.name === `${base}-${n}`) || (ref && `${base}-${n}` === ref.name)) n++;
+  const name = `${base}-${n}`;
+  parts.push({ type: 'text', md: ref ? `I'll clone the shape of ${link('vm', ref.id, ref.name)}: **${ref.size.vcpus} vCPU · ${ref.size.ramGB} GB**, same image, network and firewalls, placed on the least-loaded host in **${ref.locationId}**. Estimated **${money(ref.monthlyCost)}**/mo.` : `I couldn't find **${want}** in this scope, so I'll prepare a general-purpose VM (4 vCPU · 8 GB) in dc1.` });
+  parts.push({ type: 'action', title: `Create VM ${name}`, lines: [`+ vm ${name} (${ref?.size.vcpus ?? 4} vCPU / ${ref?.size.ramGB ?? 8} GB)`, ref?.ipIds?.length ? `+ public IPv4 from ${ref.locationId} pool` : `+ private IP in the same subnet as ${ref?.name ?? 'the default network'}`, `~ firewalls: same as ${ref?.name ?? 'project default'}`], cta: 'Open prefilled form', to: `/infrastructure/vms/new?name=${name}&location=${ref?.locationId ?? 'dc1'}`, risk: 'low' });
   return parts;
 }
 

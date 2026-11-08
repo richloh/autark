@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Check, ChevronsUpDown, FolderKanban, Building, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useList } from '@/api/hooks';
@@ -10,10 +11,15 @@ import type { Account, Project } from '@/types';
 export function ScopeSwitcher() {
   const { accountId, projectId, setScope } = useUi();
   const navigate = useNavigate();
-  const { items: accounts } = useList<Account>('accounts');
-  const { items: projects } = useList<Project>('projects');
+  const { items: accounts, isSuccess: accountsLoaded } = useList<Account>('accounts');
+  const { items: projects, isSuccess: projectsLoaded, isFetching: projectsFetching } = useList<Project>('projects');
   const account = accounts.find((a) => a.id === accountId);
   const project = projects.find((p) => p.id === projectId);
+  // A persisted scope can point at an account/project that no longer exists (e.g. after a data reset): fall back.
+  useEffect(() => {
+    if (accountsLoaded && accounts.length && !account) { setScope(accounts[0].id, ''); return }
+    if (projectId && projectsLoaded && !projectsFetching && !projects.some((p) => p.id === projectId && p.accountId === accountId)) setScope(accountId, '');
+  }, [accountsLoaded, projectsLoaded, projectsFetching, accounts, projects, account, accountId, projectId, setScope]);
   return (
     <Popover
       align="start"

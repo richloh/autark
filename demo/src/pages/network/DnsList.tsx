@@ -157,7 +157,7 @@ function CreateZoneModal({ open, onClose }: { open: boolean; onClose: () => void
           <Segmented value={kind} onChange={setKind} options={[{ value: 'public', label: 'Public', icon: <Globe2 className="size-3.5" /> }, { value: 'private', label: 'Private (VPC)', icon: <Lock className="size-3.5" /> }]} />
         </Field>
         <Field label="Domain" required error={errors.name} hint={kind === 'public' ? (pro ? 'You must own it — delegate NS at your registrar afterwards.' : "You'll point your registrar to our nameservers afterwards.") : 'e.g. app.internal, corp.lan'}>
-          <Input mono value={name} onChange={(e) => setName(e.target.value.trim().toLowerCase())} placeholder={kind === 'public' ? 'example.com' : 'app.internal'} autoFocus invalid={!!errors.name} />
+          <Input mono value={name} onChange={(e) => setName(e.target.value.trim().toLowerCase())} placeholder={kind === 'public' ? 'regiocom-energie.de' : 'app.internal'} autoFocus invalid={!!errors.name} />
         </Field>
         {kind === 'private' && (
           <Field label="VPC" required error={errors.networkId} hint={!nets.length ? 'No VPC in this project.' : 'Records resolve via the VPC resolver (x.x.0.2).'}>

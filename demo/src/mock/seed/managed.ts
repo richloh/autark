@@ -1,5 +1,5 @@
 import type { DbInstance, DbPreset, DbBackup, LoadBalancer, Certificate } from '@/types';
-import { ago, ahead, tags, scope, DAY, HOUR } from './util';
+import { ago, ahead, tags, ptags, scope, DAY, HOUR } from './util';
 
 export function seedManaged() {
   const dbPresets: DbPreset[] = [
@@ -13,26 +13,44 @@ export function seedManaged() {
     { id: 'db-rd-m', name: 'Redis-M', engine: 'redis', vcpus: 2, ramGB: 16, storageGB: 32, description: 'Feature stores, sessions', builtIn: true },
   ];
 
+  const enneoTags = (env: string) => tags({ env, team: 'enneo' });
   const base = { storageAutoscale: true, readReplicas: 0, publicAccess: false, parameters: {} as Record<string, string> };
   const dbInstances: DbInstance[] = [
-    { ...base, id: 'db-001', name: 'pg-app1', ...scope('proj-app1'), engine: 'postgres', version: '16', status: 'available', size: { presetId: 'db-pg-m', vcpus: 4, ramGB: 16 }, storageGB: 200, storageUsedGB: 84, ha: true, readReplicas: 1,
-      locationId: 'dc1', networkId: 'net-001', subnetId: 'sn-002', firewallIds: ['fw-004'], host: 'pg-app1.db.dc1.autark.internal', port: 5432, privateIp: '10.10.2.50', primaryHostId: 'bm-003', standbyHostId: 'bm-005', deletionProtection: true,
-      users: [{ username: 'postgres', role: 'owner', createdAt: ago(300 * DAY) }, { username: 'app', role: 'readwrite', createdAt: ago(300 * DAY) }, { username: 'metabase', role: 'readonly', createdAt: ago(40 * DAY) }],
-      databases: [{ name: 'shop', owner: 'app', sizeMB: 61_200 }, { name: 'sessions', owner: 'app', sizeMB: 4_100 }, { name: 'audit', owner: 'postgres', sizeMB: 12_800 }],
-      backups: { enabled: true, schedule: 'daily', retention: 14, pitr: true, window: '01:00-02:00' }, maintenanceWindow: { day: 'sun', hour: 3 },
-      parameters: { max_connections: '400', shared_buffers: '4GB', work_mem: '16MB', log_min_duration_statement: '500' }, createdAt: ago(300 * DAY), tags: tags({ env: 'prod', app: 'web' }) },
-    { ...base, id: 'db-002', name: 'redis-ml', ...scope('proj-ml'), engine: 'redis', version: '7.4', status: 'available', size: { presetId: 'db-rd-m', vcpus: 2, ramGB: 16 }, storageGB: 32, storageUsedGB: 9, ha: false,
-      locationId: 'dc1', networkId: 'net-002', subnetId: 'sn-003', firewallIds: ['fw-007'], host: 'redis-ml.db.dc1.autark.internal', port: 6379, privateIp: '10.20.1.50', primaryHostId: 'bm-008',
-      users: [{ username: 'default', role: 'owner', createdAt: ago(180 * DAY) }, { username: 'feast', role: 'readwrite', createdAt: ago(100 * DAY) }], databases: [{ name: 'db0', owner: 'default', sizeMB: 9_100 }],
-      backups: { enabled: true, schedule: 'daily', retention: 3, pitr: false, window: '03:00-04:00' }, maintenanceWindow: { day: 'sat', hour: 4 }, parameters: { 'maxmemory-policy': 'allkeys-lru' }, createdAt: ago(180 * DAY), tags: tags({ team: 'ml' }) },
-    { ...base, id: 'db-003', name: 'mysql-app2', ...scope('proj-app2'), engine: 'mysql', version: '8.0', status: 'available', size: { presetId: 'db-my-m', vcpus: 4, ramGB: 8 }, storageGB: 100, storageUsedGB: 71, ha: false,
-      locationId: 'dc2', networkId: 'net-003', subnetId: 'sn-005', firewallIds: ['fw-012'], host: 'mysql-app2.db.dc2.autark.internal', port: 3306, privateIp: '10.30.2.50', primaryHostId: 'bm-004',
-      users: [{ username: 'root', role: 'owner', createdAt: ago(280 * DAY) }, { username: 'portal', role: 'readwrite', createdAt: ago(280 * DAY) }], databases: [{ name: 'portal', owner: 'portal', sizeMB: 70_300 }],
-      backups: { enabled: true, schedule: 'daily', retention: 7, pitr: false, window: '02:00-03:00' }, maintenanceWindow: { day: 'sun', hour: 2 }, parameters: { innodb_buffer_pool_size: '5G', max_connections: '300' }, pendingRestart: ['innodb_buffer_pool_size'], createdAt: ago(280 * DAY), tags: tags({ env: 'staging', app: 'portal' }) },
-    { ...base, id: 'db-004', name: 'pg-billing', ...scope('proj-app2'), engine: 'postgres', version: '17', status: 'available', size: { presetId: 'db-pg-s', vcpus: 2, ramGB: 4 }, storageGB: 50, storageUsedGB: 12, ha: false,
-      locationId: 'dc2', networkId: 'net-003', subnetId: 'sn-005', firewallIds: ['fw-012'], host: 'pg-billing.db.dc2.autark.internal', port: 5432, privateIp: '10.30.2.51', primaryHostId: 'bm-011',
-      users: [{ username: 'postgres', role: 'owner', createdAt: ago(30 * DAY) }, { username: 'billing', role: 'readwrite', createdAt: ago(30 * DAY) }], databases: [{ name: 'billing', owner: 'billing', sizeMB: 11_900 }],
-      backups: { enabled: true, schedule: 'hourly', retention: 7, pitr: true, window: '00:00-24:00' }, maintenanceWindow: { day: 'wed', hour: 2 }, createdAt: ago(30 * DAY), tags: tags({ env: 'prod', app: 'billing' }) },
+    { ...base, id: 'db-001', name: 'compass-db', ...scope('proj-compass'), engine: 'postgres', version: '16', status: 'available', size: { presetId: null, vcpus: 16, ramGB: 128 }, storageGB: 1000, storageUsedGB: 612, ha: true, readReplicas: 1,
+      locationId: 'dc1', networkId: 'net-001', subnetId: 'sn-002', firewallIds: ['fw-003'], host: 'compass-db.db.dc1.autark.internal', port: 5432, privateIp: '10.10.2.50', primaryHostId: 'bm-002', standbyHostId: 'bm-003', deletionProtection: true,
+      users: [{ username: 'postgres', role: 'owner', createdAt: ago(670 * DAY) }, { username: 'compass_app', role: 'readwrite', createdAt: ago(670 * DAY) }, { username: 'compass_batch', role: 'readwrite', createdAt: ago(640 * DAY) },
+        { username: 'orchestrator', role: 'readonly', createdAt: ago(500 * DAY) }, { username: 'controlling_bi', role: 'readonly', createdAt: ago(120 * DAY) }],
+      databases: [{ name: 'compass', owner: 'compass_app', sizeMB: 548_000 }, { name: 'compass_reporting', owner: 'compass_app', sizeMB: 51_200 }, { name: 'compass_audit', owner: 'postgres', sizeMB: 22_400 }],
+      backups: { enabled: true, schedule: 'hourly', retention: 30, pitr: true, window: '00:00-24:00' }, maintenanceWindow: { day: 'sun', hour: 3 },
+      parameters: { max_connections: '600', shared_buffers: '32GB', effective_cache_size: '96GB', work_mem: '64MB', log_min_duration_statement: '1000' }, createdAt: ago(670 * DAY), tags: ptags('proj-compass', 'prod', { app: 'compass' }) },
+    { ...base, id: 'db-002', name: 'compass-cache', ...scope('proj-compass'), engine: 'redis', version: '7.4', status: 'available', size: { presetId: 'db-rd-m', vcpus: 2, ramGB: 16 }, storageGB: 32, storageUsedGB: 6, ha: false,
+      locationId: 'dc1', networkId: 'net-001', subnetId: 'sn-002', firewallIds: ['fw-003'], host: 'compass-cache.db.dc1.autark.internal', port: 6379, privateIp: '10.10.2.60', primaryHostId: 'bm-001',
+      users: [{ username: 'default', role: 'owner', createdAt: ago(600 * DAY) }, { username: 'compass', role: 'readwrite', createdAt: ago(600 * DAY) }], databases: [{ name: 'db0', owner: 'default', sizeMB: 6_100 }],
+      backups: { enabled: true, schedule: 'daily', retention: 3, pitr: false, window: '03:00-04:00' }, maintenanceWindow: { day: 'sun', hour: 4 }, parameters: { 'maxmemory-policy': 'allkeys-lru' }, createdAt: ago(600 * DAY), tags: ptags('proj-compass', 'prod', { app: 'compass' }) },
+    { ...base, id: 'db-003', name: 'orchestrator-db', ...scope('proj-orchestrator'), engine: 'postgres', version: '16', status: 'available', size: { presetId: 'db-pg-l', vcpus: 8, ramGB: 32 }, storageGB: 500, storageUsedGB: 188, ha: true,
+      locationId: 'dc1', networkId: 'net-002', subnetId: 'sn-005', firewallIds: ['fw-007'], host: 'orchestrator-db.db.dc1.autark.internal', port: 5432, privateIp: '10.20.2.50', primaryHostId: 'bm-001', standbyHostId: 'bm-002', deletionProtection: true,
+      users: [{ username: 'postgres', role: 'owner', createdAt: ago(520 * DAY) }, { username: 'temporal', role: 'readwrite', createdAt: ago(520 * DAY) }, { username: 'orchestrator', role: 'readwrite', createdAt: ago(520 * DAY) }],
+      databases: [{ name: 'temporal', owner: 'temporal', sizeMB: 96_000 }, { name: 'temporal_visibility', owner: 'temporal', sizeMB: 21_500 }, { name: 'orchestrator', owner: 'orchestrator', sizeMB: 38_200 }, { name: 'mako', owner: 'orchestrator', sizeMB: 27_900 }],
+      backups: { enabled: true, schedule: 'hourly', retention: 14, pitr: true, window: '00:00-24:00' }, maintenanceWindow: { day: 'sun', hour: 2 },
+      parameters: { max_connections: '400', shared_buffers: '8GB', work_mem: '32MB' }, createdAt: ago(520 * DAY), tags: ptags('proj-orchestrator', 'prod') },
+    { ...base, id: 'db-004', name: 'enneo-prod-db', ...scope('proj-enneo-regiocom'), engine: 'postgres', version: '17', status: 'available', size: { presetId: null, vcpus: 8, ramGB: 64 }, storageGB: 1000, storageUsedGB: 420, ha: true,
+      locationId: 'dc1', networkId: 'net-012', subnetId: 'sn-022', firewallIds: ['fw-019'], host: 'enneo-prod-db.db.dc1.autark.internal', port: 5432, privateIp: '10.60.2.50', primaryHostId: 'bm-003', standbyHostId: 'bm-001', deletionProtection: true,
+      users: [{ username: 'postgres', role: 'owner', createdAt: ago(236 * DAY) }, { username: 'enneo', role: 'readwrite', createdAt: ago(236 * DAY) }, { username: 'analytics', role: 'readonly', createdAt: ago(60 * DAY) }],
+      databases: [{ name: 'enneo', owner: 'enneo', sizeMB: 312_000 }, { name: 'enneo_vectors', owner: 'enneo', sizeMB: 98_000 }],
+      backups: { enabled: true, schedule: 'hourly', retention: 14, pitr: true, window: '00:00-24:00' }, maintenanceWindow: { day: 'sat', hour: 3 },
+      parameters: { shared_preload_libraries: 'vector,pg_stat_statements', shared_buffers: '16GB', max_connections: '300' }, createdAt: ago(236 * DAY), tags: enneoTags('prod') },
+    { ...base, id: 'db-005', name: 'enneo-queue', ...scope('proj-enneo-regiocom'), engine: 'redis', version: '7.4', status: 'available', size: { presetId: 'db-rd-m', vcpus: 2, ramGB: 16 }, storageGB: 32, storageUsedGB: 4, ha: false,
+      locationId: 'dc1', networkId: 'net-012', subnetId: 'sn-022', firewallIds: ['fw-019'], host: 'enneo-queue.db.dc1.autark.internal', port: 6379, privateIp: '10.60.2.60', primaryHostId: 'bm-002',
+      users: [{ username: 'default', role: 'owner', createdAt: ago(236 * DAY) }, { username: 'worker', role: 'readwrite', createdAt: ago(236 * DAY) }], databases: [{ name: 'db0', owner: 'default', sizeMB: 3_900 }],
+      backups: { enabled: true, schedule: 'daily', retention: 3, pitr: false, window: '03:00-04:00' }, maintenanceWindow: { day: 'sat', hour: 4 }, parameters: { 'maxmemory-policy': 'noeviction', appendonly: 'yes' }, createdAt: ago(236 * DAY), tags: enneoTags('prod') },
+    { ...base, id: 'db-006', name: 'website-db', ...scope('proj-website'), engine: 'mariadb', version: '11.4', status: 'available', size: { presetId: 'db-ma-m', vcpus: 4, ramGB: 8 }, storageGB: 100, storageUsedGB: 23, ha: false,
+      locationId: 'dc2', networkId: 'net-005', subnetId: 'sn-012', firewallIds: ['fw-010'], host: 'website-db.db.dc2.autark.internal', port: 3306, privateIp: '10.40.2.50', primaryHostId: 'bm-015',
+      users: [{ username: 'root', role: 'owner', createdAt: ago(600 * DAY) }, { username: 'typo3', role: 'readwrite', createdAt: ago(600 * DAY) }], databases: [{ name: 'typo3', owner: 'typo3', sizeMB: 21_800 }],
+      backups: { enabled: true, schedule: 'daily', retention: 14, pitr: false, window: '02:00-03:00' }, maintenanceWindow: { day: 'sun', hour: 2 }, parameters: { innodb_buffer_pool_size: '5G', max_connections: '200' }, pendingRestart: ['innodb_buffer_pool_size'], createdAt: ago(600 * DAY), tags: ptags('proj-website', 'prod') },
+    { ...base, id: 'db-007', name: 'enneo-staging-db', ...scope('proj-enneo-intern'), engine: 'postgres', version: '17', status: 'available', size: { presetId: 'db-pg-s', vcpus: 2, ramGB: 4 }, storageGB: 100, storageUsedGB: 31, ha: false,
+      locationId: 'dc1', networkId: 'net-010', subnetId: 'sn-018', firewallIds: ['fw-020'], host: 'enneo-staging-db.db.dc1.autark.internal', port: 5432, privateIp: '10.70.2.50', primaryHostId: 'bm-005',
+      users: [{ username: 'postgres', role: 'owner', createdAt: ago(200 * DAY) }, { username: 'enneo', role: 'readwrite', createdAt: ago(200 * DAY) }], databases: [{ name: 'enneo', owner: 'enneo', sizeMB: 29_000 }],
+      backups: { enabled: true, schedule: 'daily', retention: 7, pitr: false, window: '01:00-02:00' }, maintenanceWindow: { day: 'wed', hour: 2 }, parameters: { shared_preload_libraries: 'vector' }, createdAt: ago(200 * DAY), tags: enneoTags('staging') },
   ];
 
   const dbBackups: DbBackup[] = [];
@@ -45,32 +63,52 @@ export function seedManaged() {
 
   const hc = { protocol: 'HTTP' as const, path: '/healthz', intervalSec: 10, timeoutSec: 3, healthyThreshold: 3, unhealthyThreshold: 3 };
   const loadBalancers: LoadBalancer[] = [
-    { id: 'lb-001', name: 'web-lb', ...scope('proj-app1'), type: 'L7', status: 'active', algorithm: 'least_connections', locationId: 'dc1', networkId: 'net-001', ipIds: ['ip-002', 'ip-014'], hostname: 'web-lb.lb.dc1.autark.cloud',
+    { id: 'lb-001', name: 'compass-lb', ...scope('proj-compass'), type: 'L7', status: 'active', algorithm: 'least_connections', locationId: 'dc1', networkId: 'net-001', ipIds: ['ip-001', 'ip-002'], hostname: 'compass-lb.lb.dc1.autark.cloud',
       listeners: [
-        { id: 'lst-1', port: 443, protocol: 'HTTPS', certificateId: 'cert-001', defaultTargetGroupId: 'tg-web', rules: [{ id: 'lr-1', pathPrefix: '/api', targetGroupId: 'tg-api' }, { id: 'lr-2', host: 'static.example.com', targetGroupId: 'tg-web' }] },
-        { id: 'lst-2', port: 80, protocol: 'HTTP', defaultTargetGroupId: 'tg-web', rules: [], redirectToHttps: true },
+        { id: 'lst-1', port: 443, protocol: 'HTTPS', certificateId: 'cert-001', defaultTargetGroupId: 'tg-compass-web', rules: [{ id: 'lr-1', pathPrefix: '/api', targetGroupId: 'tg-compass-api' }] },
+        { id: 'lst-2', port: 80, protocol: 'HTTP', defaultTargetGroupId: 'tg-compass-web', rules: [], redirectToHttps: true },
       ],
       targetGroups: [
-        { id: 'tg-web', name: 'web', protocol: 'HTTP', port: 80, stickySessions: false, healthCheck: hc, targets: [
-          { ref: { type: 'vm', id: 'vm-001' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-003' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-009' }, weight: 50, health: 'unhealthy' }] },
-        { id: 'tg-api', name: 'api', protocol: 'HTTP', port: 8080, stickySessions: true, healthCheck: { ...hc, path: '/api/health' }, targets: [
-          { ref: { type: 'k8s', id: 'k8s-001' }, port: 30080, weight: 100, health: 'healthy' }] },
+        { id: 'tg-compass-web', name: 'compass-web', protocol: 'HTTP', port: 8080, stickySessions: true, healthCheck: { ...hc, path: '/actuator/health' }, targets: [
+          { ref: { type: 'vm', id: 'vm-001' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-002' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-003' }, weight: 100, health: 'healthy' }] },
+        { id: 'tg-compass-api', name: 'compass-api', protocol: 'HTTP', port: 8081, stickySessions: false, healthCheck: { ...hc, path: '/api/health' }, targets: [
+          { ref: { type: 'vm', id: 'vm-001' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-002' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-003' }, weight: 100, health: 'healthy' }] },
       ],
-      firewallIds: ['fw-006'], proxyProtocol: false, createdAt: ago(280 * DAY), tags: tags({ env: 'prod' }) },
-    { id: 'lb-002', name: 'api-staging-lb', ...scope('proj-app2'), type: 'L4', status: 'active', algorithm: 'round_robin', locationId: 'dc2', networkId: 'net-003', ipIds: ['ip-007'], hostname: 'api-staging-lb.lb.dc2.autark.cloud',
-      listeners: [{ id: 'lst-3', port: 8080, protocol: 'TCP', defaultTargetGroupId: 'tg-api2', rules: [] }, { id: 'lst-4', port: 443, protocol: 'TCP', defaultTargetGroupId: 'tg-api2', rules: [] }],
-      targetGroups: [{ id: 'tg-api2', name: 'api-servers', protocol: 'TCP', port: 8080, stickySessions: false, healthCheck: { ...hc, protocol: 'TCP', path: '' }, targets: [
-        { ref: { type: 'vm', id: 'vm-004' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-010' }, weight: 100, health: 'healthy' }] }],
-      firewallIds: ['fw-008'], proxyProtocol: true, createdAt: ago(200 * DAY), tags: tags({ env: 'staging' }) },
+      firewallIds: ['fw-004'], proxyProtocol: false, createdAt: ago(660 * DAY), tags: ptags('proj-compass', 'prod') },
+    { id: 'lb-002', name: 'website-lb', ...scope('proj-website'), type: 'L7', status: 'active', algorithm: 'round_robin', locationId: 'dc2', networkId: 'net-005', ipIds: ['ip-010', 'ip-011'], hostname: 'website-lb.lb.dc2.autark.cloud',
+      listeners: [
+        { id: 'lst-3', port: 443, protocol: 'HTTPS', certificateId: 'cert-002', defaultTargetGroupId: 'tg-website', rules: [] },
+        { id: 'lst-4', port: 80, protocol: 'HTTP', defaultTargetGroupId: 'tg-website', rules: [], redirectToHttps: true },
+      ],
+      targetGroups: [{ id: 'tg-website', name: 'typo3', protocol: 'HTTP', port: 80, stickySessions: false, healthCheck: { ...hc, path: '/typo3/health' }, targets: [
+        { ref: { type: 'vm', id: 'vm-014' }, weight: 100, health: 'healthy' }, { ref: { type: 'vm', id: 'vm-015' }, weight: 100, health: 'healthy' }] }],
+      firewallIds: ['fw-011'], proxyProtocol: false, createdAt: ago(600 * DAY), tags: ptags('proj-website', 'prod') },
+    { id: 'lb-003', name: 'orchestrator-as4', ...scope('proj-orchestrator'), type: 'L4', status: 'active', algorithm: 'round_robin', locationId: 'dc1', networkId: 'net-002', ipIds: ['ip-004'], hostname: 'orchestrator-as4.lb.dc1.autark.cloud',
+      listeners: [{ id: 'lst-5', port: 443, protocol: 'TCP', defaultTargetGroupId: 'tg-edifact', rules: [] }],
+      targetGroups: [{ id: 'tg-edifact', name: 'edifact-gateway', protocol: 'TCP', port: 30443, stickySessions: false, healthCheck: { ...hc, protocol: 'TCP', path: '' }, targets: [
+        { ref: { type: 'k8s', id: 'k8s-001' }, port: 30443, weight: 100, health: 'healthy' }] }],
+      firewallIds: ['fw-006'], proxyProtocol: true, createdAt: ago(500 * DAY), tags: ptags('proj-orchestrator', 'prod') },
+    { id: 'lb-004', name: 'enneo-ingress', ...scope('proj-enneo-regiocom'), type: 'L7', status: 'active', algorithm: 'least_connections', locationId: 'dc1', networkId: 'net-012', ipIds: ['ip-007'], hostname: 'enneo-ingress.lb.dc1.autark.cloud',
+      listeners: [
+        { id: 'lst-6', port: 443, protocol: 'HTTPS', certificateId: 'cert-004', defaultTargetGroupId: 'tg-enneo', rules: [] },
+        { id: 'lst-7', port: 80, protocol: 'HTTP', defaultTargetGroupId: 'tg-enneo', rules: [], redirectToHttps: true },
+      ],
+      targetGroups: [{ id: 'tg-enneo', name: 'ingress-nginx', protocol: 'HTTP', port: 30080, stickySessions: false, healthCheck: hc, targets: [
+        { ref: { type: 'k8s', id: 'k8s-002' }, port: 30080, weight: 100, health: 'healthy' }] }],
+      firewallIds: ['fw-018'], proxyProtocol: false, createdAt: ago(236 * DAY), tags: enneoTags('prod') },
   ];
 
   const certificates: Certificate[] = [
-    { id: 'cert-001', name: 'example-com', ...scope('proj-app1'), domains: ['example.com', '*.example.com'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(62 * DAY), autoRenew: true, createdAt: ago(28 * DAY), tags: [],
-      challenge: 'dns-01', keyType: 'ECDSA P-256', issuedAt: ago(28 * DAY), serial: '04:a1:9c:3e:77:10:5b:d2', fingerprint: 'SHA256:3f:9a:12:c4:8e:71:0b:d5:66:20:aa:4e:19:c3:72:e1' },
-    { id: 'cert-002', name: 'api-example-org', ...scope('proj-app2'), domains: ['api.example.org'], issuer: 'custom', status: 'expiring', expiresAt: ahead(9 * DAY), autoRenew: false, createdAt: ago(356 * DAY), tags: [],
-      keyType: 'RSA 2048', issuedAt: ago(356 * DAY), serial: '1c:07:e2:94:5a:b3:0f:68', fingerprint: 'SHA256:b2:47:0e:91:dd:35:7c:a8:10:f4:63:2b:9e:05:c1:7a' },
-    { id: 'cert-003', name: 'static-example-com', ...scope('proj-app1'), domains: ['static.example.com'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(80 * DAY), autoRenew: true, createdAt: ago(10 * DAY), tags: [],
-      challenge: 'http-01', keyType: 'ECDSA P-256', issuedAt: ago(10 * DAY), serial: '03:5e:aa:10:c9:42:81:7d', fingerprint: 'SHA256:71:c0:2d:e8:55:9b:14:a3:0c:e6:48:bf:23:90:d7:6e' },
+    { id: 'cert-001', name: 'compass-regiocom-energie-de', ...scope('proj-compass'), domains: ['compass.regiocom-energie.de'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(54 * DAY), autoRenew: true, createdAt: ago(36 * DAY), tags: [],
+      challenge: 'dns-01', keyType: 'ECDSA P-256', issuedAt: ago(36 * DAY), serial: '04:a1:9c:3e:77:10:5b:d2', fingerprint: 'SHA256:3f:9a:12:c4:8e:71:0b:d5:66:20:aa:4e:19:c3:72:e1' },
+    { id: 'cert-002', name: 'regiocom-energie-de', ...scope('proj-website'), domains: ['regiocom-energie.de', 'www.regiocom-energie.de'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(71 * DAY), autoRenew: true, createdAt: ago(19 * DAY), tags: [],
+      challenge: 'http-01', keyType: 'ECDSA P-256', issuedAt: ago(19 * DAY), serial: '03:5e:aa:10:c9:42:81:7d', fingerprint: 'SHA256:71:c0:2d:e8:55:9b:14:a3:0c:e6:48:bf:23:90:d7:6e' },
+    { id: 'cert-003', name: 'as4-regiocom-energie-de', ...scope('proj-orchestrator'), domains: ['as4.regiocom-energie.de', 'mako.regiocom-energie.de'], issuer: 'custom', status: 'expiring', expiresAt: ahead(12 * DAY), autoRenew: false, createdAt: ago(353 * DAY), tags: tags({ pki: 'SM-PKI' }),
+      keyType: 'ECDSA P-256', issuedAt: ago(353 * DAY), serial: '1c:07:e2:94:5a:b3:0f:68', fingerprint: 'SHA256:b2:47:0e:91:dd:35:7c:a8:10:f4:63:2b:9e:05:c1:7a' },
+    { id: 'cert-004', name: 'regiocom-enneo-ai', ...scope('proj-enneo-regiocom'), domains: ['regiocom.enneo.ai', 'api.regiocom.enneo.ai'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(48 * DAY), autoRenew: true, createdAt: ago(42 * DAY), tags: [],
+      challenge: 'dns-01', keyType: 'ECDSA P-256', issuedAt: ago(42 * DAY), serial: '04:7d:31:aa:02:9e:c6:15', fingerprint: 'SHA256:0c:5e:8a:33:d1:47:b9:20:6f:e4:12:7a:c8:93:5d:02' },
+    { id: 'cert-005', name: 'gitlab-regiocom-energie-de', ...scope('proj-tools'), domains: ['gitlab.regiocom-energie.de'], issuer: 'letsencrypt', status: 'issued', expiresAt: ahead(33 * DAY), autoRenew: true, createdAt: ago(57 * DAY), tags: [],
+      challenge: 'http-01', keyType: 'ECDSA P-256', issuedAt: ago(57 * DAY), serial: '03:e2:19:5b:70:c4:aa:81', fingerprint: 'SHA256:9d:2a:61:f0:3c:84:e7:15:ba:40:6d:c2:91:08:7e:53' },
   ];
 
   return { dbInstances, dbPresets, dbBackups, loadBalancers, certificates };

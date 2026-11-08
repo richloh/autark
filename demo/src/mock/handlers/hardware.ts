@@ -2,12 +2,13 @@ import { db } from '../db';
 import { defineCollection, route, collections, ApiError, validate, nameError, newId, nowIso, getOr404, notify, type Ctx } from '../framework';
 import { startOperation, onOperationComplete, transition, type StepSpec } from '../operations';
 import { registerMetrics, generateSeries, type MetricProfile } from '../metrics';
-import { hostAllocation, hostCapacity, pickHost } from './shared';
+import { hostAllocation, hostCapacity, pickHost, managedPlacements, workloadFor, policyNames, type ManagedItem } from './shared';
+import { hostRoles, hostAccess, policyReason, policyErrors, normaliseAccess, ROLE_META, accessSummary } from '@/lib/hostPolicy';
 import { vmComputeCost } from './costs';
 import { hashString, mulberry32 } from '@/lib/random';
 import type {
   BareMetalHost, CloudProvider, VM, Location, Operation, HostDisk, HostNic, HostProbe, HostSensors, HostVmSummary, EvacuationPlan, EvacuationMove,
-  ProviderCatalogEntry, ProviderKind, ProviderRegion, IpAddress, IpPool, HostHealthCheck,
+  ProviderCatalogEntry, ProviderKind, ProviderRegion, IpAddress, IpPool, HostHealthCheck, HostRole, HostAccess, Account, Project, Volume,
 } from '@/types';
 
 /* Hardware: bare metal hosts (the physical fleet that VMs are scheduled on) and cloud providers
@@ -204,7 +205,10 @@ function planEvacuation(host: BareMetalHost): EvacuationPlan {
     const need = { vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0 };
     let best: { id: string; free: number } | null = null;
     let reason = targets.length ? 'No ready host has enough free capacity' : `No other ready host in ${host.locationId}`;
-    for (const s of state.values()) {
+    const wl = workloadFor(vm.projectId, 'compute', vm.accountId);
+    const allowed = [...state.values()].filter((s) => !policyReason(s.h, wl, policyNames));
+    if (targets.length && !allowed.length) reason = `No other host may run it (host policies: ${[...new Set(targets.map((t) => policyReason(t, wl, policyNames)))].slice(0, 2).join('; ')})`;
+    for (const s of allowed) {
       const gpuOk = need.gpus === 0 || (s.h.gpus.some((g) => g.model === vm.gpu?.model) && s.cap.gpus - s.used.gpus >= need.gpus);
       if (!gpuOk) { if (need.gpus) reason = `No host with ${need.gpus}× free ${vm.gpu?.model} GPU`; continue }
       const freeRam = s.cap.ramGB - s.used.ramGB - need.ramGB;
@@ -224,13 +228,105 @@ function planEvacuation(host: BareMetalHost): EvacuationPlan {
   const feasible = blocked.length === 0;
   const message = !moves.length ? `${host.name} has no VMs. It can enter maintenance immediately.`
     : feasible ? `${moves.length} VM${moves.length > 1 ? 's' : ''} will be ${moves.some((m) => m.live) ? 'live-' : ''}migrated to ${new Set(moves.map((m) => m.targetHostId)).size} host(s) in ${host.locationId}.`
-    : `Cannot evacuate ${host.name}: ${blocked.map((m) => `${m.vmName} (${m.vcpus} vCPU / ${m.ramGB} GB${m.gpus ? ` / ${m.gpus}× GPU` : ''})`).join(', ')} ${blocked.length > 1 ? 'do' : 'does'} not fit on any other ready host in ${host.locationId}. Add capacity, exit maintenance on another host, or stop/delete ${blocked.length > 1 ? 'these VMs' : 'this VM'}.`;
+    : `Cannot evacuate ${host.name}: ${blocked.map((m) => `${m.vmName} (${m.vcpus} vCPU / ${m.ramGB} GB${m.gpus ? ` / ${m.gpus}× GPU` : ''})`).join(', ')} ${blocked.length > 1 ? 'do' : 'does'} not fit on any other ready host in ${host.locationId} that its project may use. Add capacity, widen host policies, exit maintenance on another host, or stop/delete ${blocked.length > 1 ? 'these VMs' : 'this VM'}.`;
   return {
     hostId: host.id, feasible, moves, message,
     targets: [...state.values()].map((s) => ({
       id: s.h.id, name: s.h.name, before: { vcpus: s.before.vcpus, ramGB: s.before.ramGB }, after: { vcpus: s.used.vcpus, ramGB: s.used.ramGB }, capacity: { vcpus: s.cap.vcpus, ramGB: s.cap.ramGB },
     })),
   };
+}
+
+/* ================================================================================================
+ * Host policies (roles & access) and the Ceph storage pool
+ * ============================================================================================== */
+
+export const ENROLL_DEFAULT_ROLES: HostRole[] = ['compute', 'k8s-worker'];
+
+const policyExists = { account: (id: string) => !!db.get<Account>('accounts', id), project: (id: string) => !!db.get<Project>('projects', id) };
+
+function validatePolicy(roles: unknown, access: unknown) {
+  validate(policyErrors(roles, access, policyExists));
+}
+
+export interface PolicyViolation {
+  kind: 'vm' | ManagedItem['kind'] | 'storage';
+  id: string; name: string; projectId?: string; reason: string;
+  /** what happens: VMs keep running; managed workloads are rescheduled (or lose their slot) */
+  outcome: 'keeps-running' | 'moves' | 'unplaced' | 'rebalance';
+  detail: string;
+}
+export interface PolicyImpact {
+  violations: PolicyViolation[];
+  /** managed workloads that would newly be placed on this host */
+  incoming: { kind: ManagedItem['kind']; id: string; name: string; vcpus: number; ramGB: number }[];
+  summary: string;
+}
+
+const rawTB = (h: BareMetalHost) => Math.round(h.disks.reduce((a, d) => a + d.sizeGB, 0) / 100) / 10;
+const KIND_LABEL: Record<PolicyViolation['kind'], string> = { vm: 'VM', db: 'Database', k8s: 'Kubernetes worker', 'k8s-cp': 'Kubernetes control plane', lb: 'Load balancer', storage: 'Ceph storage' };
+
+/** What a new policy would mean for workloads already on the host (nothing is changed). */
+function policyImpact(h: BareMetalHost, roles: HostRole[], access: HostAccess): PolicyImpact {
+  const next: BareMetalHost = { ...h, roles, access };
+  const violations: PolicyViolation[] = [];
+  for (const vm of hostVms(h.id)) {
+    const reason = policyReason(next, workloadFor(vm.projectId, 'compute', vm.accountId), policyNames);
+    if (reason) violations.push({ kind: 'vm', id: vm.id, name: vm.name, projectId: vm.projectId, reason, outcome: 'keeps-running', detail: 'Keeps running here. New VMs of this project are placed elsewhere — migrate it to comply.' });
+  }
+  const before = managedPlacements();
+  const after = managedPlacements(new Map([[h.id, { roles, access }]]));
+  const whereAfter = (m: ManagedItem) => { for (const [hid, list] of after) if (list.some((x) => x.kind === m.kind && x.name === m.name)) return hid; return null };
+  for (const m of before.get(h.id) ?? []) {
+    const reason = policyReason(next, workloadFor(m.projectId, m.role), policyNames);
+    if (!reason) continue;
+    const to = whereAfter(m);
+    const toName = to ? db.get<BareMetalHost>('hosts', to)?.name ?? to : null;
+    violations.push({
+      kind: m.kind, id: m.id, name: m.name, projectId: m.projectId, reason, outcome: to ? 'moves' : 'unplaced',
+      detail: to ? `Rescheduled onto ${toName}` : `No other eligible host in ${h.locationId} — it needs a host with the ${ROLE_META[m.role].short.toLowerCase()} role${m.projectId ? ` that ${policyNames.project(m.projectId)} may use` : ''}`,
+    });
+  }
+  const had = before.get(h.id) ?? [];
+  const incoming = (after.get(h.id) ?? []).filter((m) => !had.some((x) => x.kind === m.kind && x.name === m.name)).map((m) => ({ kind: m.kind, id: m.id, name: m.name, vcpus: m.vcpus, ramGB: m.ramGB }));
+  if (hostRoles(h).includes('storage') && !roles.includes('storage') && h.disks.length) {
+    const pool = storagePools().find((p) => p.locationId === h.locationId);
+    const remaining = (pool?.hosts ?? []).filter((x) => x.id !== h.id);
+    const usableAfter = remaining.reduce((a, x) => a + x.rawTB, 0) / 3;
+    const tight = pool && pool.usedTB > usableAfter * 0.85;
+    violations.push({
+      kind: 'storage', id: h.id, name: `Ceph OSDs on ${h.name}`, reason: 'Storage role removed', outcome: 'rebalance',
+      detail: remaining.length < 3 ? `Only ${remaining.length} storage host(s) would remain in ${h.locationId} — 3× replication needs at least 3.`
+        : `Ceph rebalances ${rawTB(h)} TB raw onto ${remaining.length} remaining storage hosts${tight ? ` — pool would be ${Math.round(((pool!.usedTB) / Math.max(0.1, usableAfter)) * 100)}% full` : ''}.`,
+    });
+  }
+  const summary = !violations.length
+    ? `No running workload conflicts with this policy.${incoming.length ? ` ${incoming.length} managed workload${incoming.length > 1 ? 's' : ''} would be placed here.` : ''}`
+    : `${violations.length} workload${violations.length > 1 ? 's' : ''} on ${h.name} ${violations.length > 1 ? 'are' : 'is'} not allowed by the new policy: ${violations.slice(0, 3).map((v) => `${KIND_LABEL[v.kind]} ${v.name}`).join(', ')}${violations.length > 3 ? ', …' : ''}.`;
+  return { violations, incoming, summary };
+}
+
+/** Ceph pool per self-hosted location, formed by hosts with the storage role (3× replication). */
+export function storagePools() {
+  const vols = db.list<Volume>('volumes');
+  const buckets = db.list<any>('buckets');
+  return db.filter<Location>('locations', (l) => l.kind === 'selfHosted').map((l) => {
+    const hosts = db.filter<BareMetalHost>('hosts', (h) => h.locationId === l.id && h.status !== 'decommissioning' && hostRoles(h).includes('storage'))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((h) => ({ id: h.id, name: h.name, status: h.status, rawTB: rawTB(h), disks: h.disks.length, up: !['offline', 'error', 'provisioning', 'rebooting'].includes(h.status) }));
+    const raw = Math.round(hosts.reduce((a, h) => a + h.rawTB, 0) * 10) / 10;
+    const usable = Math.round((raw / 3) * 10) / 10;
+    const volumesTB = vols.filter((v) => v.locationId === l.id).reduce((a, v) => a + v.sizeGB, 0) / 1000;
+    const bucketsTB = buckets.filter((b) => b.locationId === l.id).reduce((a, b) => a + (b.bytesUsed ?? 0), 0) / 1e12;
+    const used = Math.round((volumesTB + bucketsTB) * 100) / 100;
+    const pct = usable ? used / usable : null;
+    const up = hosts.filter((h) => h.up).length;
+    const health = !hosts.length ? 'none' : up < 3 ? 'degraded' : pct != null && pct >= 0.85 ? 'nearfull' : 'ok';
+    return {
+      locationId: l.id, locationName: l.name, country: l.country, replication: 3, hosts, hostsUp: up,
+      rawTB: raw, usableTB: usable, usedTB: used, volumesTB: Math.round(volumesTB * 100) / 100, bucketsTB: Math.round(bucketsTB * 100) / 100, pct, health,
+    };
+  });
 }
 
 /* ================================================================================================
@@ -261,7 +357,7 @@ function enrollSteps(h: BareMetalHost, inv: HostProbe, body: { bmcUser: string; 
     { name: 'Install Autark agent', ms: ms(1.2), logs: [`autark-agent ${LATEST_AGENT} installed (systemd unit enabled)`, 'mTLS certificate issued by cluster CA (valid 90d, auto-rotate)', 'registered with control plane, heartbeat OK'] },
     { name: 'Join cluster networking (VXLAN/EVPN)', ms: ms(1.6), logs: ['FRR: BGP EVPN sessions established with spine-1, spine-2', `VTEP ${body.mgmtIp} announced (type-3 routes)`, 'MTU 9000 verified end-to-end', 'storage network reachable (ceph mon quorum 3/3)'] },
     { name: 'Burn-in tests', ms: ms(2.4), logs: ['stress-ng cpu 60s: ok, max temp 71°C', 'memtester 5% pass: ok, 0 ECC errors', `fio randread 4k QD32: ${inv.disks[0]?.type === 'nvme' ? '812k' : '96k'} IOPS`, `iperf3 → spine-1: ${(inv.nics[0].speedGbps * 0.95).toFixed(1)} Gbit/s`] },
-    { name: 'Mark host ready', ms: ms(0.6), logs: ['scheduler: host added to pool', `schedulable capacity: ${cap.vcpus} vCPU / ${cap.ramGB} GB${gpuTotal ? ` / ${gpuTotal} GPU` : ''}`] },
+    { name: 'Mark host ready', ms: ms(0.6), logs: ['scheduler: host added to pool', `roles: ${hostRoles(h).join(', ')} · available to ${accessSummary(h, policyNames).replace(/^Reserved for /, '').replace('All accounts & projects', 'all accounts')}`, ...(hostRoles(h).includes('storage') ? [`ceph: ${inv.disks.length} OSD(s) added to the ${h.locationId} pool`] : []), `schedulable capacity: ${cap.vcpus} vCPU / ${cap.ramGB} GB${gpuTotal ? ` / ${gpuTotal} GPU` : ''}`] },
   ];
 }
 
@@ -307,12 +403,13 @@ onOperationComplete('host.evacuated', (_op, p: { id: string; reason?: string; mo
     if (!vm || vm.hostId !== p.id) continue;
     let target = db.get<BareMetalHost>('hosts', m.targetHostId);
     // re-validate: capacity may have been taken while the evacuation ran
+    const wl = workloadFor(vm.projectId, 'compute', vm.accountId);
     if (target) {
       const cap = hostCapacity(target); const used = hostAllocation(target.id);
-      if (target.status !== 'ready' || used.vcpus + vm.size.vcpus > cap.vcpus || used.ramGB + vm.size.ramGB > cap.ramGB) target = undefined;
+      if (target.status !== 'ready' || policyReason(target, wl, policyNames) || used.vcpus + vm.size.vcpus > cap.vcpus || used.ramGB + vm.size.ramGB > cap.ramGB) target = undefined;
     }
     if (!target) {
-      try { target = pickHost(vm.locationId, { vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0, gpuModel: vm.gpu?.model }, p.id) } catch { target = undefined }
+      try { target = pickHost(vm.locationId, { vcpus: vm.size.vcpus, ramGB: vm.size.ramGB, gpus: vm.gpu?.count ?? 0, gpuModel: vm.gpu?.model }, p.id, wl) } catch { target = undefined }
     }
     if (target) db.update<VM>('vms', vm.id, { hostId: target.id, status: vm.status === 'migrating' ? m.prevStatus : vm.status });
     else { stuck.push(vm.name); db.update<VM>('vms', vm.id, { status: vm.status === 'migrating' ? m.prevStatus : vm.status }) }
@@ -633,7 +730,7 @@ export function registerHardware() {
   /* ------------------------------------------------------------------ hosts */
   defineCollection<BareMetalHost>({
     name: 'hosts', kind: 'bareMetal', idPrefix: 'bm', scoped: false,
-    searchText: (h) => `${h.id} ${h.name} ${h.locationId} ${h.rack} ${h.vendor} ${h.model} ${h.cpuModel} ${h.mgmtIp} ${h.bmcIp} ${h.serial} ${h.status} ${h.gpus.map((g) => g.model).join(' ')} ${h.tags.map((t) => `${t.key}:${t.value}`).join(' ')}`,
+    searchText: (h) => `${h.id} ${h.name} ${h.locationId} ${h.rack} ${h.vendor} ${h.model} ${h.cpuModel} ${h.mgmtIp} ${h.bmcIp} ${h.serial} ${h.status} ${h.gpus.map((g) => g.model).join(' ')} ${h.tags.map((t) => `${t.key}:${t.value}`).join(' ')} ${hostRoles(h).join(' ')} ${accessSummary(h, policyNames)}`,
     subtitle: (h) => `Host · ${h.locationId} ${h.rack} U${h.rackUnit} · ${h.cpuCores} cores / ${h.ramGB} GB · ${h.status}`,
     sort: (a, b) => a.locationId.localeCompare(b.locationId) || a.name.localeCompare(b.name),
     decorate: (h) => {
@@ -642,6 +739,7 @@ export function registerHardware() {
       const fwLatest = TEMPLATES.find((t) => t.vendor === h.vendor)?.fw.bmc;
       return {
         ...h,
+        roles: hostRoles(h), access: hostAccess(h),
         bmcCredential: h.bmcCredential ? '••••••••' : undefined,
         allocated: hostAllocation(h.id), capacity, vms: vms.map(vmSummary), sensors: sensorsFor(h),
         latestAgentVersion: LATEST_AGENT,
@@ -675,6 +773,8 @@ export function registerHardware() {
       });
       const clash = rackConflict(loc!.id, body.rack, rackUnit, sizeU);
       if (clash) validate({ rackUnit: `U${rackUnit}–${rackUnit + sizeU - 1} overlaps ${clash.name} (U${clash.rackUnit}–${clash.rackUnit + clash.sizeU - 1}) in rack ${clash.rack}` });
+      const roles: HostRole[] = body.roles ?? ENROLL_DEFAULT_ROLES;
+      validatePolicy(roles, body.access ?? undefined);
 
       const host: BareMetalHost = {
         id: newId('bm'), name: body.name, locationId: loc!.id, rack: String(body.rack).toUpperCase(), rackUnit, sizeU,
@@ -684,6 +784,7 @@ export function registerHardware() {
         hypervisor: 'KVM', bmcIp: body.bmcIp, mgmtIp: body.mgmtIp, status: 'provisioning', cpuOvercommit: cpuOc, ramOvercommit: ramOc,
         agentVersion: '—', kernel: '—', bootedAt: nowIso(), createdAt: nowIso(), tags: Array.isArray(body.tags) ? body.tags : [], powerWatts: auto ? 0 : inv.estimatedWatts,
         bmcUser: String(body.bmcUser), bmcCredential: '••••••••', firmware: auto ? undefined : inv.firmware, maintenanceReason: null, lastHealthCheck: null, notes: body.notes ?? '',
+        roles: [...new Set(roles)], access: normaliseAccess(body.access),
       };
       return host;
     },
@@ -865,8 +966,33 @@ export function registerHardware() {
         });
       },
       decommission: (ctx, h) => { decommission(ctx, h); return { ok: true, async: true } },
+      /** Set workload roles & availability. Existing workloads keep running; new placements follow the policy. */
+      updatePolicy: (_ctx, h, body) => {
+        const roles: HostRole[] = Array.isArray(body?.roles) ? [...new Set(body.roles as HostRole[])] : hostRoles(h);
+        const access = body?.access !== undefined ? body.access : hostAccess(h);
+        validatePolicy(roles, access);
+        const norm = normaliseAccess(access);
+        const impact = policyImpact(h, roles, norm);
+        db.update<BareMetalHost>('hosts', h.id, { roles, access: norm });
+        if (impact.violations.some((v) => v.outcome === 'unplaced')) {
+          notify('warning', `${h.name}: policy leaves workloads without a host`, impact.violations.filter((v) => v.outcome === 'unplaced').map((v) => `${v.name}: ${v.detail}`).join(' · '), `/hardware/bare-metals/${h.id}?tab=policy`);
+        }
+        return { ok: true, id: h.id, roles, access: norm, ...impact };
+      },
     },
   });
+
+  /** Dry-run of updatePolicy: validation + impact report, nothing is saved (not audited). */
+  route('POST', '/hosts/:id/policy-preview', (ctx) => {
+    const h = getOr404<BareMetalHost>('hosts', ctx.params.id, 'Host');
+    const roles: HostRole[] = Array.isArray(ctx.body?.roles) ? [...new Set(ctx.body.roles as HostRole[])] : hostRoles(h);
+    const access = ctx.body?.access !== undefined ? ctx.body.access : hostAccess(h);
+    const errors = policyErrors(roles, access, policyExists);
+    if (Object.keys(errors).length) return { valid: false, errors, violations: [], incoming: [], summary: Object.values(errors)[0] };
+    return { valid: true, errors: {}, ...policyImpact(h, roles, normaliseAccess(access)) };
+  }, 'Preview the impact of a host policy change (roles & access) without saving it');
+
+  route('GET', '/hosts/storage-pools', () => ({ items: storagePools() }), 'Ceph storage pool per location (raw / usable / used TB) formed by hosts with the storage role');
 
   /** Probe a BMC before enrollment (simulated Redfish discovery). */
   route('POST', '/hosts/probe', (ctx) => {

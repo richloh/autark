@@ -45,7 +45,7 @@ export function startOperation(o: StartOperationOpts): Operation {
     target: o.target,
     accountId: o.scope?.accountId,
     projectId: o.scope?.projectId,
-    actor: o.actor ?? 'alice@example.com',
+    actor: o.actor ?? 'dennis@regiocom-energie.de',
     status: 'running',
     progress: 0,
     steps: o.steps.map<OperationStep>((s) => ({ name: s.name, durationMs: Math.max(150, Math.round(s.ms * speed)), status: 'pending', logs: [] })),

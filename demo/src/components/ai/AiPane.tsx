@@ -136,7 +136,7 @@ function Chat({ onClose, closeIcon: CloseIcon }: { onClose: () => void; closeIco
         <span className="flex size-7 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-sm shadow-indigo-500/30"><Sparkles className="size-3.5" /></span>
         <div className="min-w-0 flex-1 leading-tight">
           <div className="text-[13px] font-semibold text-fg">Autark Copilot</div>
-          <div className="flex items-center gap-1 text-[10.5px] text-muted"><span className="size-1.5 rounded-full bg-emerald-500" /> Llama 3.3 70B · on dc1-gpu-01</div>
+          <div className="flex items-center gap-1 text-[10.5px] text-muted"><span className="size-1.5 rounded-full bg-emerald-500" /> Llama 3.3 70B · on mdg-gpu-01</div>
         </div>
         <button title="History" aria-label="History" onClick={() => toast.info('Conversation history', 'Saved conversations will appear here.')} className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg"><History className="size-4" /></button>
         <button title="New chat" aria-label="New chat" onClick={() => { cancelled.current = true; setMsgs([]); setBusy(false) }} className="flex size-8 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-fg"><SquarePen className="size-4" /></button>

@@ -115,7 +115,7 @@ export default function Developer() {
     }
     const spec = {
       openapi: '3.1.0', info: { title: 'Autark API', version: 'v1', description: 'Sovereign cloud control plane API' },
-      servers: [{ url: 'https://autark.example.com/api/v1' }],
+      servers: [{ url: 'https://autark.regiocom-energie.de/api/v1' }],
       components: { securitySchemes: { bearer: { type: 'http', scheme: 'bearer' } } }, security: [{ bearer: [] }], paths,
     };
     downloadFile('autark-openapi.json', JSON.stringify(spec, null, 2), 'application/json');
@@ -132,7 +132,7 @@ export default function Developer() {
         </>} />
 
       <div className="mb-5 grid grid-cols-1 gap-3 @min-[36rem]:grid-cols-2 @min-[60rem]:grid-cols-4">
-        <Fact icon={Globe} title="Base URL" body={<span className="flex items-center gap-1"><code className="font-mono text-[12.5px] text-fg">https://autark.example.com/api/v1</code><CopyButton value="https://autark.example.com/api/v1" /></span>} />
+        <Fact icon={Globe} title="Base URL" body={<span className="flex items-center gap-1"><code className="font-mono text-[12.5px] text-fg">https://autark.regiocom-energie.de/api/v1</code><CopyButton value="https://autark.regiocom-energie.de/api/v1" /></span>} />
         <Fact icon={KeyRound} title="Authentication" body={<>Bearer token of a <Link to="/iam/system-accounts" className="text-brand-500 hover:underline">system account</Link>, scoped by roles, projects, IP allowlist and tag conditions.</>} />
         <Fact icon={Layers} title="Scope" body={<>Headers <code className="font-mono text-[12px]">x-autark-account</code> and optional <code className="font-mono text-[12px]">x-autark-project</code> select the tenant.</>} />
         <Fact icon={Timer} title="Async by design" body={<>Long-running writes return immediately and start an <Link to="/activity" className="text-brand-500 hover:underline">operation</Link> you can poll or cancel.</>} />
@@ -351,41 +351,41 @@ const TF_PROVIDER = `terraform {
 }
 
 provider "autark" {
-  endpoint = "https://autark.example.com"
+  endpoint = "https://autark.regiocom-energie.de"
   # token is read from AUTARK_TOKEN (system account token)
-  account  = "acc-myco-a"
-  project  = "proj-app1"
+  account  = "acc-regiocom"
+  project  = "proj-compass"
 }`;
 
-const TF_STACK = `resource "autark_network" "prod" {
-  name        = "prod-vpc"
+const TF_STACK = `resource "autark_network" "compass" {
+  name        = "vpc-compass"
   location_id = "dc1"
   cidr        = "10.10.0.0/16"
   nat_gateway = true
   subnet {
-    name   = "app"
+    name   = "compass-app"
     cidr   = "10.10.1.0/24"
     public = false
   }
 }
 
-resource "autark_vm" "web" {
+resource "autark_vm" "compass_app" {
   count       = 3
-  name        = "web-\${count.index + 1}"
+  name        = "compass-app-\${count.index + 1}"
   location_id = "dc1"
-  preset      = "general-4"
-  image_id    = "img-ubuntu-2404"
-  network_id  = autark_network.prod.id
-  subnet_id   = autark_network.prod.subnet[0].id
+  preset      = "vm-c16"
+  image_id    = "img-compass-golden"
+  network_id  = autark_network.compass.id
+  subnet_id   = autark_network.compass.subnet[0].id
   backups     = true
   tags = {
-    env  = "prod"
-    team = "web"
+    env          = "prod"
+    kostenstelle = "4100"
   }
 }
 
-resource "autark_database" "main" {
-  name        = "pg-main"
+resource "autark_database" "compass" {
+  name        = "compass-db"
   engine      = "postgres"
   version     = "17"
   location_id = "dc1"
@@ -393,7 +393,7 @@ resource "autark_database" "main" {
   ram_gb      = 16
   storage_gb  = 200
   ha          = true
-  network_id  = autark_network.prod.id
+  network_id  = autark_network.compass.id
 }
 
 resource "autark_kubernetes_cluster" "apps" {
@@ -418,7 +418,7 @@ function TerraformTab() {
       <div className="min-w-0 space-y-4">
         <Card><CardHeader title="1 · Configure the provider" description="terraform-provider-autark talks to the same REST API; resources map 1:1 to collections." /><CardBody><CodeBlock language="hcl" code={TF_PROVIDER} /></CardBody></Card>
         <Card><CardHeader title="2 · Describe your stack" description="Networks, VMs, databases and clusters — on your own hardware or burst cloud, same syntax." /><CardBody><CodeBlock language="hcl" maxHeight="max-h-[520px]" code={TF_STACK} /></CardBody></Card>
-        <Card><CardHeader title="3 · Plan & apply" /><CardBody><CodeBlock language="bash" code={`export AUTARK_TOKEN=atk_live_…   # from IAM → System accounts\nterraform init\nterraform plan -out tf.plan\nterraform apply tf.plan\n\n# adopt resources created in the console\nterraform import autark_vm.legacy vm-001`} /></CardBody></Card>
+        <Card><CardHeader title="3 · Plan & apply" /><CardBody><CodeBlock language="bash" code={`export AUTARK_TOKEN=atk_live_…   # from IAM → System accounts\nterraform init\nterraform plan -out tf.plan\nterraform apply tf.plan\n\n# adopt resources created in the console\nterraform import autark_vm.compass_app_1 vm-001`} /></CardBody></Card>
       </div>
       <div className="space-y-4">
         <Card className="p-4">
@@ -442,14 +442,14 @@ function CliTab() {
   return (
     <div className="grid gap-4 @min-[60rem]:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0 space-y-4">
-        <Card><CardHeader title="Install & log in" /><CardBody><CodeBlock language="bash" code={`# macOS / Linux\nbrew install autark-cloud/tap/autark\n# or: go install github.com/autark-cloud/autark-cli@latest\n\nautark login https://autark.example.com      # SSO in the browser\nautark login --token $AUTARK_TOKEN           # CI / headless\nautark context use acc-myco-a --project proj-app1`} /></CardBody></Card>
+        <Card><CardHeader title="Install & log in" /><CardBody><CodeBlock language="bash" code={`# macOS / Linux\nbrew install autark-cloud/tap/autark\n# or: go install github.com/autark-cloud/autark-cli@latest\n\nautark login https://autark.regiocom-energie.de      # SSO in the browser\nautark login --token $AUTARK_TOKEN           # CI / headless\nautark context use acc-regiocom --project proj-compass`} /></CardBody></Card>
         <Card><CardHeader title="Everyday commands" /><CardBody><CodeBlock language="bash" maxHeight="max-h-[520px]" code={`autark vm list --status running -o table
-autark vm create web-4 --location dc1 --preset general-4 --image img-ubuntu-2404 \\
-  --network net-001 --tag env=prod --wait
-autark vm ssh web-4
-autark vm resize web-4 --vcpus 8 --ram-gb 32
+autark vm create compass-app-4 --location dc1 --preset vm-c16 --image img-compass-golden \\
+  --network net-001 --tag env=prod --tag kostenstelle=4100 --wait
+autark vm ssh compass-app-4
+autark vm resize compass-app-4 --vcpus 8 --ram-gb 32
 
-autark db create pg-main --engine postgres --version 17 --ha --storage-gb 200
+autark db create compass-db --engine postgres --version 17 --ha --storage-gb 200
 autark k8s kubeconfig apps > ~/.kube/autark-apps
 
 autark ops list --running                 # long-running operations
@@ -511,7 +511,7 @@ function McpTab() {
       "command": "autark",
       "args": ["mcp", "serve", "--read-only"],
       "env": {
-        "AUTARK_URL": "https://autark.example.com",
+        "AUTARK_URL": "https://autark.regiocom-energie.de",
         "AUTARK_TOKEN": "atk_live_…"
       }
     }
@@ -521,7 +521,7 @@ function McpTab() {
   "mcpServers": {
     "autark": {
       "type": "http",
-      "url": "https://autark.example.com/mcp",
+      "url": "https://autark.regiocom-energie.de/mcp",
       "headers": { "Authorization": "Bearer atk_live_…" }
     }
   }
