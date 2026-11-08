@@ -19,8 +19,8 @@ export function useStoragePools() {
   return useGet<{ items: StoragePool[] }>(['hosts', 'storage-pools'], '/hosts/storage-pools');
 }
 
-type Managed = { kind: 'db' | 'k8s' | 'k8s-cp' | 'lb'; vcpus: number; ramGB: number };
-const KIND_ROLE: Record<Managed['kind'], HostRole> = { db: 'compute', k8s: 'k8s-worker', 'k8s-cp': 'k8s-control-plane', lb: 'load-balancer' };
+type Managed = { kind: 'db' | 'k8s' | 'k8s-cp' | 'lb' | 'platform' | 'platform-cp'; vcpus: number; ramGB: number };
+const KIND_ROLE: Record<Managed['kind'], HostRole> = { db: 'compute', k8s: 'k8s-worker', 'k8s-cp': 'k8s-control-plane', lb: 'load-balancer', platform: 'k8s-worker', 'platform-cp': 'k8s-control-plane' };
 
 /** Pro fleet summary: capacity per workload role + Ceph pool usage per location. */
 export function FleetRoles({ hosts, locationFilter = 'all', className, onRole }: { hosts: BareMetalHost[]; locationFilter?: string; className?: string; onRole?: (r: HostRole) => void }) {

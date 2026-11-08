@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Rocket, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Rocket, Zap, Gauge } from 'lucide-react';
 import { api, ApiClientError } from '@/api/client';
 import { useApiMutation } from '@/api/hooks';
 import { Modal } from '@/components/ui/Modal';
@@ -14,7 +14,7 @@ import { cn } from '@/lib/cn';
 import { fmtCpu, fmtMem, poolNodeCost } from './k8sUi';
 import { Advanced } from '@/components/ui/Pro';
 import { usePro } from '@/store/ui';
-import type { K8sCluster, K8sClusterSummary, K8sWorkload, Tag } from '@/types';
+import type { K8sCluster, K8sClusterSummary, K8sSpace, K8sWorkload, SpaceQuota, Tag } from '@/types';
 
 const TEMPLATES: Record<string, { label: string; name: string; image: string; replicas: number; cpu: number; mem: number; ports: string; kind: K8sWorkload['kind']; expose: K8sWorkload['expose']; gpu?: number; schedule?: string }> = {
   nginx: { label: 'nginx web', name: 'web', image: 'nginx:1.27-alpine', replicas: 3, cpu: 100, mem: 128, ports: '80', kind: 'Deployment', expose: 'ClusterIP' },
@@ -27,7 +27,7 @@ const TEMPLATES: Record<string, { label: string; name: string; image: string; re
 
 interface SimResult { before: K8sClusterSummary; after: K8sClusterSummary; workloadPending: number; newlyPending: number; reasons: string[]; autoscale: { poolId: string; poolName: string; from: number; to: number } | null }
 
-export function toManifest(c: K8sCluster, w: { namespace: string; name: string; kind: string; image: string; replicas: number; cpuRequestM: number; memRequestMi: number; ports: number[]; gpuPerPod?: number; schedule?: string; env?: Tag[]; expose?: string }): string {
+export function toManifest(c: { name: string }, w: { namespace: string; name: string; kind: string; image: string; replicas: number; cpuRequestM: number; memRequestMi: number; ports: number[]; gpuPerPod?: number; schedule?: string; env?: Tag[]; expose?: string }): string {
   const container = [
     `      - name: ${w.name}`,
     `        image: ${w.image}`,
@@ -50,8 +50,17 @@ export function toManifest(c: K8sCluster, w: { namespace: string; name: string; 
   return `# kubectl --context ${c.name} apply -f -\n` + lines.join('\n');
 }
 
-export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDeployed }: { cluster: K8sCluster; open: boolean; onClose: () => void; namespaces: string[]; onDeployed?: (w: K8sWorkload) => void }) {
+/**
+ * Deploy a workload to a dedicated cluster (`cluster`) or into a shared-cluster space (`space`).
+ * In a space the namespace is fixed, requests count against the space quota (422 quota_exceeded) and
+ * there is no node-level scheduler dry-run — the aside shows quota headroom instead.
+ */
+export function DeployWorkloadModal({ cluster, space, spaceUsed, onResize, open, onClose, namespaces = ['default'], onDeployed }: {
+  cluster?: K8sCluster; space?: K8sSpace; spaceUsed?: SpaceQuota; onResize?: () => void;
+  open: boolean; onClose: () => void; namespaces?: string[]; onDeployed?: (w: K8sWorkload) => void;
+}) {
   const pro = usePro();
+  const targetName = cluster?.name ?? space?.name ?? '';
   const [tpl, setTpl] = useState('nginx');
   const [name, setName] = useState('web');
   const [namespace, setNamespace] = useState('default');
@@ -69,25 +78,30 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [sim, setSim] = useState<SimResult | null>(null);
-  const hasGpu = cluster.nodePools.some((p) => p.gpu);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
+  const hasGpu = !!cluster?.nodePools.some((p) => p.gpu);
 
   const applyTpl = (k: string) => {
     const t = TEMPLATES[k];
     setTpl(k); setName(t.name); setImage(t.image); setReplicas(t.replicas); setCpu(t.cpu); setMem(t.mem); setPorts(t.ports); setKind(t.kind); setExpose(t.expose ?? 'none'); setGpu(t.gpu ?? 0); if (t.schedule) setSchedule(t.schedule);
   };
-  useEffect(() => { if (open) { setErrors({}); setFormError(null) } }, [open]);
+  useEffect(() => { if (open) { setErrors({}); setFormError(null); setQuotaError(null); if (space) setNamespace(space.namespace) } }, [open, space?.namespace]); // eslint-disable-line
+  useEffect(() => { if (space && kind === 'DaemonSet') setKind('Deployment') }, [space, kind]);
 
   const portList = ports.split(/[,\s]+/).filter(Boolean).map(Number);
   const nodeSelector = pool ? [{ key: 'autark.io/pool', value: pool }] : undefined;
-  const body = {
-    clusterId: cluster.id, namespace, name, kind, image, replicas: kind === 'DaemonSet' ? 0 : replicas, cpuRequestM: cpu, memRequestMi: mem, ports: portList,
+  const body = space ? {
+    spaceId: space.id, clusterId: space.platformClusterId, namespace: space.namespace, name, kind, image, replicas, cpuRequestM: cpu, memRequestMi: mem, ports: portList,
+    expose, schedule: kind === 'CronJob' ? schedule : undefined, env,
+  } : {
+    clusterId: cluster!.id, namespace, name, kind, image, replicas: kind === 'DaemonSet' ? 0 : replicas, cpuRequestM: cpu, memRequestMi: mem, ports: portList,
     gpuPerPod: gpu || undefined, expose, schedule: kind === 'CronJob' ? schedule : undefined, env, nodeSelector,
   };
 
   // dry-run the scheduler while the user edits (debounced)
   const simKey = JSON.stringify([kind, replicas, cpu, mem, gpu, pool, namespace, open]);
   useEffect(() => {
-    if (!open || kind === 'CronJob') { setSim(null); return }
+    if (!open || kind === 'CronJob' || !cluster) { setSim(null); return }
     const t = setTimeout(() => {
       api.post<SimResult>(`/k8sClusters/${cluster.id}/simulate`, { workload: { namespace, name, kind, replicas: kind === 'DaemonSet' ? 0 : replicas, cpuRequestM: cpu, memRequestMi: mem, gpuPerPod: gpu || undefined, nodeSelector } })
         .then(setSim).catch(() => setSim(null));
@@ -97,14 +111,31 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
 
   const deploy = useApiMutation(() => api.create<K8sWorkload>('k8sWorkloads', body), {
     silent: true,
-    onSuccess: (w) => { toast.success(`Deploying ${w.namespace}/${w.name}`, 'Watch the pods land on the cluster map.'); onDeployed?.(w); onClose() },
-    onError: (e: ApiClientError) => { setErrors(fieldErrors(e)); setFormError(e.message) },
+    onSuccess: (w) => { toast.success(`Deploying ${w.namespace}/${w.name}`, space ? 'Pods start in a few seconds.' : 'Watch the pods land on the cluster map.'); onDeployed?.(w); onClose() },
+    onError: (e: ApiClientError) => {
+      setErrors(fieldErrors(e));
+      if (e.code === 'quota_exceeded' || (space && e.status === 422 && /quota/i.test(e.message))) { setQuotaError(e.message); setFormError(null) } else { setFormError(e.message); setQuotaError(null) }
+    },
   });
 
   const nameErr = name && !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(name) ? 'Lowercase letters, digits and dashes' : errors.name;
-  const totalCpu = cpu * (kind === 'DaemonSet' ? cluster.nodePools.reduce((a, p) => a + p.count, 0) : replicas);
-  const totalMem = mem * (kind === 'DaemonSet' ? cluster.nodePools.reduce((a, p) => a + p.count, 0) : replicas);
-  const manifest = useMemo(() => toManifest(cluster, { ...body, env }), [JSON.stringify(body)]); // eslint-disable-line
+  const nodeCount = cluster?.nodePools.reduce((a, p) => a + p.count, 0) ?? 0;
+  const podsAdded = kind === 'CronJob' ? 1 : kind === 'DaemonSet' ? nodeCount : replicas;
+  const totalCpu = cpu * podsAdded;
+  const totalMem = mem * podsAdded;
+  const manifest = useMemo(() => toManifest({ name: targetName }, { ...body, env }), [JSON.stringify(body)]); // eslint-disable-line
+  const kubectl = space ? `kubectl --kubeconfig ${space.name}-kubeconfig.yaml` : `kubectl --context ${targetName}`;
+  // quota headroom in a space
+  const headroom = space ? (() => {
+    const used = spaceUsed ?? { cpuCores: 0, memoryGi: 0, storageGi: 0, pods: 0, loadBalancers: 0 };
+    const rows = [
+      { label: 'CPU', used: used.cpuCores, add: totalCpu / 1000, max: space.quota.cpuCores, fmt: (v: number) => `${+v.toFixed(2)}` , unit: ' cores' },
+      { label: 'Memory', used: used.memoryGi, add: totalMem / 1024, max: space.quota.memoryGi, fmt: (v: number) => `${+v.toFixed(1)}`, unit: ' GiB' },
+      { label: 'Pods', used: used.pods, add: podsAdded, max: space.quota.pods, fmt: (v: number) => String(Math.round(v)), unit: '' },
+      ...(expose === 'LoadBalancer' || space.quota.loadBalancers > 0 ? [{ label: 'Load balancers', used: used.loadBalancers, add: expose === 'LoadBalancer' ? 1 : 0, max: space.quota.loadBalancers, fmt: (v: number) => String(v), unit: '' }] : []),
+    ];
+    return { rows, over: rows.filter((r) => r.used + r.add > r.max + 1e-9) };
+  })() : null;
 
   const nameField = <Field label="Name" required error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} mono invalid={!!nameErr} /></Field>;
   const namespaceField = (
@@ -113,9 +144,10 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
       <datalist id="k8s-ns">{namespaces.filter((n) => n !== 'kube-system').map((n) => <option key={n} value={n} />)}</datalist>
     </Field>
   );
-  const kindField = <Field label="Kind"><Segmented value={kind} onChange={setKind} options={[{ value: 'Deployment', label: 'Deployment' }, { value: 'StatefulSet', label: 'StatefulSet' }, { value: 'DaemonSet', label: 'DaemonSet' }, { value: 'CronJob', label: 'CronJob' }]} /></Field>;
+  const kinds = [{ value: 'Deployment' as const, label: 'Deployment' }, { value: 'StatefulSet' as const, label: 'StatefulSet' }, ...(space ? [] : [{ value: 'DaemonSet' as const, label: 'DaemonSet' }]), { value: 'CronJob' as const, label: 'CronJob' }];
+  const kindField = <Field label="Kind"><Segmented value={kind} onChange={setKind} options={kinds} /></Field>;
   const imageField = (
-    <Field label="Container image" required error={errors.image} hint={cluster.addons.kyverno ? (pro ? 'Kyverno policy is active: images must use a pinned tag (no :latest).' : 'Use a fixed version tag, not :latest.') : undefined}>
+    <Field label="Container image" required error={errors.image} hint={cluster?.addons.kyverno ? (pro ? 'Kyverno policy is active: images must use a pinned tag (no :latest).' : 'Use a fixed version tag, not :latest.') : undefined}>
       <Input value={image} onChange={(e) => setImage(e.target.value)} mono placeholder="registry/app:1.0.0" invalid={!!errors.image} />
     </Field>
   );
@@ -137,21 +169,30 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
       <Select value={expose} onChange={(e) => setExpose(e.target.value as typeof expose)} options={[{ value: 'none', label: 'Not exposed' }, { value: 'ClusterIP', label: pro ? 'ClusterIP service' : 'Inside the cluster' }, { value: 'LoadBalancer', label: pro ? 'LoadBalancer (public)' : 'Public (load balancer)' }]} />
     </Field>
   );
-  const poolField = (
+  const poolField = cluster ? (
     <Field label="Node pool">
       <Select value={pool} onChange={(e) => setPool(e.target.value)} options={[{ value: '', label: 'Any (scheduler decides)' }, ...cluster.nodePools.map((p) => ({ value: p.name, label: p.name }))]} />
     </Field>
-  );
+  ) : null;
   const envField = <Field label="Environment variables" optional><TagEditor value={env} onChange={setEnv} suggestions={['LOG_LEVEL', 'PORT', 'NODE_ENV']} /></Field>;
   const advancedNeeded = ['namespace', 'cpuRequestM', 'memRequestMi', 'gpuPerPod', 'schedule'].some((k) => errors[k]);
 
   return (
-    <Modal open={open} onClose={onClose} size="xl" title="Deploy workload" description={pro ? `Runs on ${cluster.name}. Requests are reserved on nodes by the scheduler — pods that don't fit stay Pending.` : `Run a container image on ${cluster.name}.`}
+    <Modal open={open} onClose={onClose} size="xl" title="Deploy workload" description={space
+      ? (pro ? `Runs in namespace ${space.namespace} on the shared cluster. Requests count against the space quota.` : `Run a container image in ${space.name}.`)
+      : pro ? `Runs on ${targetName}. Requests are reserved on nodes by the scheduler — pods that don't fit stay Pending.` : `Run a container image on ${targetName}.`}
       footer={<>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button variant="primary" icon={Rocket} loading={deploy.isPending} disabled={!name || !!nameErr || !image} onClick={() => deploy.mutate()}>Deploy</Button>
       </>}>
       {formError && <Hint tone="danger" className="mb-4">{formError}</Hint>}
+      {quotaError && (
+        <Hint tone="warning" className="mb-4">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1"><b>Not enough quota.</b> {quotaError}
+            {onResize && <button type="button" className="font-medium underline" onClick={() => { onClose(); onResize() }}>Resize quota</button>}
+          </span>
+        </Hint>
+      )}
       <div className="grid gap-5 @min-[56rem]:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-4">
           <Field label="Start from">
@@ -165,13 +206,13 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
             <>
               <div className="grid gap-3 @min-[36rem]:grid-cols-2">
                 {nameField}
-                {namespaceField}
+                {space ? <Field label="Namespace" hint="Fixed to this space"><Input value={space.namespace} readOnly disabled mono /></Field> : namespaceField}
               </div>
               {kindField}
               {imageField}
               {replicasField}
               {resourcesFields}
-              <div className="grid gap-3 @min-[36rem]:grid-cols-3">
+              <div className={cn('grid gap-3', poolField ? '@min-[36rem]:grid-cols-3' : '@min-[36rem]:grid-cols-2')}>
                 {portsField}
                 {exposeField}
                 {poolField}
@@ -181,7 +222,7 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
                 <summary className="cursor-pointer text-xs font-medium text-muted hover:text-fg">Show manifest / kubectl</summary>
                 <IacTabs className="mt-2" title="Equivalent manifest" snippets={{
                   yaml: manifest,
-                  cli: kind === 'CronJob' ? `kubectl --context ${cluster.name} -n ${namespace} create cronjob ${name} --image=${image} --schedule="${schedule}"` : `kubectl --context ${cluster.name} -n ${namespace} create deployment ${name} \\\n  --image=${image} --replicas=${replicas}${portList[0] ? ` --port=${portList[0]}` : ''}\nkubectl -n ${namespace} set resources deployment ${name} --requests=cpu=${cpu}m,memory=${mem}Mi`,
+                  cli: kind === 'CronJob' ? `${kubectl} -n ${namespace} create cronjob ${name} --image=${image} --schedule="${schedule}"` : `${kubectl} -n ${namespace} create deployment ${name} \\\n  --image=${image} --replicas=${replicas}${portList[0] ? ` --port=${portList[0]}` : ''}\nkubectl -n ${namespace} set resources deployment ${name} --requests=cpu=${cpu}m,memory=${mem}Mi`,
                   curl: toCurl('POST', '/k8sWorkloads', body),
                 }} />
               </details>
@@ -196,7 +237,7 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
               </div>
               <Advanced key={advancedNeeded ? 'adv-open' : 'adv'} defaultOpen={advancedNeeded || undefined} description={`${kind} · ${fmtCpu(cpu)} CPU, ${fmtMem(mem)} per pod · namespace ${namespace} · ${expose === 'LoadBalancer' ? 'public' : expose === 'ClusterIP' ? 'internal service' : 'not exposed'}`}>
                 {kindField}
-                {namespaceField}
+                {!space && namespaceField}
                 {resourcesFields}
                 <div className="grid gap-3 @min-[36rem]:grid-cols-2">
                   {exposeField}
@@ -214,7 +255,35 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
             <div className="mt-1 text-lg font-semibold tabular text-fg">{fmtCpu(totalCpu)} · {fmtMem(totalMem)}</div>
             {gpu > 0 && <div className="text-xs text-lime-600 dark:text-lime-400">{gpu * replicas}× GPU</div>}
           </div>}
-          {kind !== 'CronJob' && (
+          {headroom && space && (
+            <div className="rounded-xl border border-line p-3">
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted"><Gauge className="size-3.5" /> Space quota</div>
+              {headroom.over.length === 0 ? (
+                <div className="mb-3 flex items-start gap-2 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="mt-0.5 size-4 shrink-0" /> Fits in your quota.</div>
+              ) : (
+                <div className="mb-3 flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <div>Exceeds the {headroom.over.map((r) => r.label.toLowerCase()).join(' and ')} quota.{onResize && <> <button type="button" className="font-medium underline" onClick={() => { onClose(); onResize() }}>Resize quota</button> or use fewer copies.</>}</div>
+                </div>
+              )}
+              <div className="space-y-2.5 text-xs">
+                {headroom.rows.map((r) => {
+                  const pct = (v: number) => (r.max > 0 ? Math.min(100, (v / r.max) * 100) : 100);
+                  const over = r.used + r.add > r.max + 1e-9;
+                  return (
+                    <div key={r.label}>
+                      <div className="mb-1 flex justify-between"><span className="text-muted">{r.label}</span><span className={cn('tabular', over ? 'font-medium text-rose-500' : 'text-fg-2')}>{r.fmt(r.used + r.add)} / {r.fmt(r.max)}{r.unit}</span></div>
+                      <div className="relative h-2 overflow-hidden rounded-full bg-surface-3">
+                        <div className="absolute inset-y-0 left-0 rounded-full bg-sky-500/40" style={{ width: `${pct(r.used)}%` }} />
+                        <div className={cn('absolute inset-y-0', over ? 'bg-rose-500' : 'bg-sky-500')} style={{ left: `${pct(r.used)}%`, width: `${Math.max(0, pct(r.used + r.add) - pct(r.used))}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {kind !== 'CronJob' && cluster && (
             <div className="rounded-xl border border-line p-3">
               <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted"><Zap className="size-3.5" /> Scheduler dry-run</div>
               {!sim ? <div className="text-xs text-faint">Calculating…</div> : (
@@ -246,8 +315,8 @@ export function DeployWorkloadModal({ cluster, open, onClose, namespaces, onDepl
             </div>
           )}
           <p className="text-[11px] leading-relaxed text-muted">
-            Workloads don't change the bill directly — nodes do.
-            {sim?.autoscale && (() => { const p = cluster.nodePools.find((x) => x.id === sim.autoscale!.poolId); return p ? <> Autoscaling adds about <b className="text-fg-2">{money(poolNodeCost(p) * (sim.autoscale!.to - sim.autoscale!.from))}/mo</b>.</> : null })()}
+            {space ? 'Workloads don’t change the bill — you pay for the reserved quota.' : 'Workloads don\'t change the bill directly — nodes do.'}
+            {cluster && sim?.autoscale && (() => { const p = cluster.nodePools.find((x) => x.id === sim.autoscale!.poolId); return p ? <> Autoscaling adds about <b className="text-fg-2">{money(poolNodeCost(p) * (sim.autoscale!.to - sim.autoscale!.from))}/mo</b>.</> : null })()}
           </p>
         </aside>
       </div>

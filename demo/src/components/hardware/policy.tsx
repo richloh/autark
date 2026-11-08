@@ -159,13 +159,14 @@ export function AccessPicker({ value, onChange, accounts, projects, error }: {
 
 /* ------------------------------------------------------------------ impact */
 
-export interface PolicyViolation { kind: 'vm' | 'db' | 'k8s' | 'k8s-cp' | 'lb' | 'storage'; id: string; name: string; projectId?: string; reason: string; outcome: 'keeps-running' | 'moves' | 'unplaced' | 'rebalance'; detail: string }
+export interface PolicyViolation { kind: 'vm' | 'db' | 'k8s' | 'k8s-cp' | 'lb' | 'storage' | 'platform' | 'platform-cp'; id: string; name: string; projectId?: string; reason: string; outcome: 'keeps-running' | 'moves' | 'unplaced' | 'rebalance'; detail: string }
 export interface PolicyImpactResult { valid?: boolean; errors?: Record<string, string>; violations: PolicyViolation[]; incoming: { kind: string; id: string; name: string; vcpus: number; ramGB: number }[]; summary: string }
 
-const KIND_LABEL: Record<string, string> = { vm: 'VM', db: 'Database', k8s: 'K8s worker', 'k8s-cp': 'Control plane', lb: 'Load balancer', storage: 'Ceph' };
+const KIND_LABEL: Record<string, string> = { vm: 'VM', db: 'Database', k8s: 'K8s worker', 'k8s-cp': 'Control plane', lb: 'Load balancer', storage: 'Ceph', platform: 'Platform node', 'platform-cp': 'Platform CP' };
 const KIND_LINK: Record<string, (id: string) => string | undefined> = {
   vm: (id) => `/infrastructure/vms/${id}`, db: (id) => `/managed-services/db/${id}`, k8s: (id) => `/managed-services/kubernetes/${id}`,
   'k8s-cp': (id) => `/managed-services/kubernetes/${id}`, lb: (id) => `/managed-services/load-balancers/${id}`, storage: () => undefined,
+  platform: (id) => `/hardware/platform-clusters/${id}`, 'platform-cp': (id) => `/hardware/platform-clusters/${id}`,
 };
 const OUTCOME: Record<PolicyViolation['outcome'], { label: string; icon: LucideIcon; cls: string }> = {
   'keeps-running': { label: 'keeps running', icon: Play, cls: 'text-amber-600 dark:text-amber-400' },

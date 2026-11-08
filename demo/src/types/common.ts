@@ -7,7 +7,7 @@ export interface Tag { key: string; value: string }
 export type ResourceKind =
   | 'vm' | 'volume' | 'snapshot' | 'image' | 'sshKey'
   | 'network' | 'ip' | 'ipPool' | 'firewall' | 'dnsZone'
-  | 'db' | 'dbBackup' | 'k8s' | 'k8sWorkload' | 'bucket' | 'accessKey' | 'lb' | 'certificate'
+  | 'db' | 'dbBackup' | 'k8s' | 'k8sWorkload' | 'k8sSpace' | 'platformCluster' | 'bucket' | 'accessKey' | 'lb' | 'certificate'
   | 'bareMetal' | 'provider' | 'location'
   | 'user' | 'role' | 'systemAccount' | 'project' | 'allowance'
   | 'operation';

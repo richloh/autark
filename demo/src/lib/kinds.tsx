@@ -22,6 +22,8 @@ export const KINDS: Record<ResourceKind, KindMeta> = {
   dbBackup: { label: 'DB backup', plural: 'DB backups', icon: Archive, color: '#64748b' },
   k8s: { label: 'Kubernetes cluster', plural: 'Kubernetes', icon: Boxes, color: '#326ce5', link: (id) => `/managed-services/kubernetes/${id}` },
   k8sWorkload: { label: 'Workload', plural: 'Workloads', icon: Box, color: '#326ce5' },
+  k8sSpace: { label: 'Kubernetes space', plural: 'Kubernetes spaces', icon: Box, color: '#0ea5e9', link: (id) => `/managed-services/kubernetes/spaces/${id}` },
+  platformCluster: { label: 'Platform cluster', plural: 'Platform clusters', icon: Boxes, color: '#326ce5', link: (id) => `/hardware/platform-clusters/${id}` },
   bucket: { label: 'Bucket', plural: 'Buckets', icon: PackageOpen, color: '#eab308', link: (id) => `/managed-services/object-storage/${id}` },
   accessKey: { label: 'Access key', plural: 'Access keys', icon: Key, color: '#64748b' },
   lb: { label: 'Load balancer', plural: 'Load balancers', icon: Scale, color: '#ec4899', link: (id) => `/managed-services/load-balancers/${id}` },

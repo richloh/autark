@@ -1,7 +1,7 @@
 import { db } from '../db';
-import { vmCost, volumeCost, dbCost, k8sCost, bucketCost, lbCost, ipCost, dnsZoneCost, PRICING } from '@/lib/pricing';
+import { vmCost, volumeCost, dbCost, k8sCost, bucketCost, lbCost, ipCost, dnsZoneCost, spaceCost, PRICING } from '@/lib/pricing';
 import { classBreakdown } from './storage';
-import type { VM, Volume, Snapshot, IpAddress, Network, DnsZone, DbInstance, K8sCluster, Bucket, LoadBalancer, Location } from '@/types';
+import type { VM, Volume, Snapshot, IpAddress, Network, DnsZone, DbInstance, K8sCluster, K8sSpace, Bucket, LoadBalancer, Location } from '@/types';
 
 /* Canonical monthly cost per resource. Used by billing endpoints and by `decorate` in handlers. */
 
@@ -31,6 +31,8 @@ export const bucketMonthly = (b: Bucket) => {
   return Math.round((storage + rest) * 100) / 100;
 };
 export const lbMonthly = (l: LoadBalancer) => lbCost({ type: l.type, dataProcessedGB: l.type === 'L7' ? 1800 : 600 }).total;
+/** Shared Kubernetes space: billed by reserved quota; a suspended space only pays for its storage. */
+export const spaceMonthly = (sp: Pick<K8sSpace, 'quota' | 'status'>) => (sp.status === 'suspended' ? spaceCost({ cpuCores: 0, memoryGi: 0, storageGi: sp.quota.storageGi, loadBalancers: 0 }).total : spaceCost(sp.quota).total);
 export const natMonthly = (n: Network) => (n.natGateway ? PRICING.natGatewayPerMonth : 0);
 
 export interface CostItem { type: string; id: string; name: string; projectId: string; accountId: string; locationId?: string; service: Service; monthly: number }
@@ -47,6 +49,8 @@ export function allCostItems(): CostItem[] {
   for (const z of db.list<DnsZone>('dnsZones')) push(z, 'dnsZone', 'network', dnsMonthly(z));
   for (const d of db.list<DbInstance>('dbInstances')) push(d, 'db', 'db', dbMonthly(d));
   for (const k of db.list<K8sCluster>('k8sClusters')) push(k, 'k8s', 'k8s', k8sMonthly(k));
+  // shared Kubernetes spaces (platform clusters themselves are provider cost, not customer cost)
+  for (const sp of db.list<K8sSpace>('k8sSpaces')) if (sp.status !== 'error') push(sp, 'k8sSpace', 'k8s', spaceMonthly(sp));
   for (const b of db.list<Bucket>('buckets')) push(b, 'bucket', 'objectStorage', bucketMonthly(b));
   for (const l of db.list<LoadBalancer>('loadBalancers')) push(l, 'lb', 'loadBalancers', lbMonthly(l));
   return out;

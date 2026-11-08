@@ -59,9 +59,9 @@ const HOSTS: HostSpec[] = [
     disks: [['nvme', 960, 2]], status: 'ready', roles: ['load-balancer'], nicGbps: 100 },
   // dc2 · RZ Frankfurt (colocation, own hardware)
   { id: 'bm-014', name: 'fra-hv-01', loc: 'dc2', rack: 'K12', u: 30, sizeU: 2, vendor: 'Dell', model: 'PowerEdge R7625', cpu: '2× AMD EPYC 9354', sockets: 2, cores: 64, ramGB: 768,
-    disks: [['nvme', 3840, 4]], status: 'ready', roles: ['compute', 'k8s-worker'], access: ALL },
+    disks: [['nvme', 3840, 4]], status: 'ready', roles: ['compute', 'k8s-worker', 'k8s-control-plane'], access: ALL },
   { id: 'bm-015', name: 'fra-hv-02', loc: 'dc2', rack: 'K12', u: 27, sizeU: 2, vendor: 'Dell', model: 'PowerEdge R7625', cpu: '2× AMD EPYC 9354', sockets: 2, cores: 64, ramGB: 768,
-    disks: [['nvme', 3840, 4]], status: 'ready', roles: ['compute', 'k8s-worker'], access: ALL },
+    disks: [['nvme', 3840, 4]], status: 'ready', roles: ['compute', 'k8s-worker', 'k8s-control-plane'], access: ALL },
   { id: 'bm-016', name: 'fra-hv-03', loc: 'dc2', rack: 'K12', u: 24, sizeU: 2, vendor: 'Lenovo', model: 'ThinkSystem SR655 V3', cpu: 'AMD EPYC 9454P', sockets: 1, cores: 48, ramGB: 512,
     disks: [['nvme', 3840, 2]], status: 'ready', roles: ['compute', 'k8s-worker'], access: ALL },
   { id: 'bm-017', name: 'fra-hv-04', loc: 'dc2', rack: 'K13', u: 30, sizeU: 2, vendor: 'Lenovo', model: 'ThinkSystem SR655', cpu: 'AMD EPYC 7443P', sockets: 1, cores: 24, ramGB: 256,

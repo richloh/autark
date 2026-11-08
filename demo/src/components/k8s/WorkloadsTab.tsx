@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Box, Rocket, MoreHorizontal, Scaling, RotateCw, Trash2, ImageUp, Layers, Clock, Database, Cpu, Puzzle, AlertTriangle, Check } from 'lucide-react';
 import { api } from '@/api/client';
-import { useApiMutation, useList } from '@/api/hooks';
+import { useApiMutation, useGet, useList } from '@/api/hooks';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Badge, StatusPill } from '@/components/ui/Badge';
 import { DataTable, FilterChips, type Column } from '@/components/ui/DataTable';
@@ -20,20 +20,31 @@ import { DeployWorkloadModal, toManifest } from './DeployWorkloadModal';
 import { fmtCpu, fmtMem, nsColor } from './k8sUi';
 import { EventsList } from './ClusterOverviewTab';
 import { usePro } from '@/store/ui';
-import type { K8sCluster, K8sTopology, K8sWorkload, K8sPod, K8sClusterSummary } from '@/types';
+import type { K8sCluster, K8sTopology, K8sWorkload, K8sPod, K8sClusterSummary, K8sSpace, SpaceQuota } from '@/types';
+import { synthPods } from './spaces/spaceUi';
 
 const KIND_ICON = { Deployment: Layers, StatefulSet: Database, DaemonSet: Cpu, CronJob: Clock };
 
-function ScaleModal({ c, w, onClose }: { c: K8sCluster; w: K8sWorkload | null; onClose: () => void }) {
+function ScaleModal({ c, space, spaceUsed, w, onClose }: { c?: K8sCluster; space?: K8sSpace; spaceUsed?: SpaceQuota; w: K8sWorkload | null; onClose: () => void }) {
   const [n, setN] = useState(1);
   const [sim, setSim] = useState<{ workloadPending: number; autoscale: { poolName: string; from: number; to: number } | null; after: K8sClusterSummary } | null>(null);
   useEffect(() => { if (w) setN(w.replicas) }, [w?.id]); // eslint-disable-line
   useEffect(() => {
-    if (!w) return;
+    if (!w || !c) return;
     const t = setTimeout(() => { api.post<typeof sim>(`/k8sClusters/${c.id}/simulate`, { workload: { id: w.id, replicas: n } }).then(setSim).catch(() => setSim(null)) }, 250);
     return () => clearTimeout(t);
   }, [n, w?.id]); // eslint-disable-line
   const scale = useApiMutation(() => api.action('k8sWorkloads', w!.id, 'scale', { replicas: n }), { success: `Scaling ${w?.name} to ${n}`, onSuccess: onClose });
+  // in a space: how many replicas the quota allows (this workload's current requests are freed first)
+  const quotaMax = space && w ? (() => {
+    const used = spaceUsed ?? { cpuCores: 0, memoryGi: 0, storageGi: 0, pods: 0, loadBalancers: 0 };
+    const lim = [
+      w.cpuRequestM > 0 ? (space.quota.cpuCores - used.cpuCores + (w.cpuRequestM * w.replicas) / 1000) / (w.cpuRequestM / 1000) : Infinity,
+      w.memRequestMi > 0 ? (space.quota.memoryGi - used.memoryGi + (w.memRequestMi * w.replicas) / 1024) / (w.memRequestMi / 1024) : Infinity,
+      space.quota.pods - used.pods + w.replicas,
+    ];
+    return Math.max(0, Math.floor(Math.min(...lim) + 1e-9));
+  })() : null;
   return (
     <Modal open={!!w} onClose={onClose} title={`Scale ${w?.namespace}/${w?.name}`} description={w ? `${fmtCpu(w.cpuRequestM)} · ${fmtMem(w.memRequestMi)} requested per pod` : undefined}
       footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" icon={Scaling} loading={scale.isPending} disabled={!w || n === w.replicas} onClick={() => scale.mutate()}>Scale to {n}</Button></>}>
@@ -44,6 +55,9 @@ function ScaleModal({ c, w, onClose }: { c: K8sCluster; w: K8sWorkload | null; o
             <NumberInput className="w-28" value={n} onChange={setN} min={0} max={200} />
           </div>
           <div className="flex flex-wrap gap-[3px]">{Array.from({ length: n }, (_, i) => <span key={i} className={cn('size-3 rounded-[3px]', i >= w.replicas ? 'animate-pulse-soft' : '')} style={{ background: i >= w.replicas ? `${nsColor(w.namespace)}66` : nsColor(w.namespace) }} />)}</div>
+          {quotaMax != null && (n > quotaMax
+            ? <Hint tone="warning">Your space quota allows up to <b>{quotaMax}</b> copies of this workload. Resize the quota in Settings to go higher.</Hint>
+            : <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><Check className="size-3.5" /> Fits in your quota (up to {quotaMax} copies)</div>)}
           {sim && n > w.replicas && (sim.workloadPending > 0
             ? <Hint tone="warning"><b>{sim.workloadPending}</b> pod(s) won't fit. {sim.autoscale ? <>The autoscaler will grow <b>{sim.autoscale.poolName}</b> {sim.autoscale.from} → {sim.autoscale.to}.</> : 'No autoscaling headroom — they will stay Pending.'}</Hint>
             : <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400"><Check className="size-3.5" /> All replicas fit · cluster CPU requested → {Math.round(sim.after.cpuRequestedPct * 100)}%</div>)}
@@ -66,7 +80,7 @@ function ImageModal({ w, onClose }: { w: K8sWorkload | null; onClose: () => void
   );
 }
 
-function WorkloadDrawer({ c, w, topology, onClose }: { c: K8sCluster; w: K8sWorkload | null; topology: K8sTopology | undefined; onClose: () => void }) {
+function WorkloadDrawer({ c, w, topology, onClose }: { c: { name: string }; w: K8sWorkload | null; topology: Pick<K8sTopology, 'pods' | 'events'> | undefined; onClose: () => void }) {
   const [tab, setTab] = useState('pods');
   const pods = (topology?.pods ?? []).filter((p) => p.workloadId === w?.id);
   const events = (topology?.events ?? []).filter((e) => w && e.object.includes(w.name));
@@ -128,9 +142,15 @@ function PodDots({ pods, max = 16 }: { pods: K8sPod[]; max?: number }) {
   );
 }
 
-export function WorkloadsTab({ cluster: c, topology, onDeployed }: { cluster: K8sCluster; topology: K8sTopology | undefined; onDeployed: () => void }) {
+/**
+ * Workloads of a dedicated cluster (`cluster` + `topology`) or of a shared-cluster space (`space`).
+ * Spaces have a single, fixed namespace, no system workloads and quota-based headroom.
+ */
+export function WorkloadsTab({ cluster: c, space, spaceUsed, onResize, topology, onDeployed }: {
+  cluster?: K8sCluster; space?: K8sSpace; spaceUsed?: SpaceQuota; onResize?: () => void; topology?: K8sTopology; onDeployed: () => void;
+}) {
   const [sp] = useSearchParams();
-  const { items: workloads, isLoading } = useList<K8sWorkload>('k8sWorkloads', { clusterId: c.id }, { refetchInterval: 3000 });
+  const { items: workloads, isLoading } = useList<K8sWorkload>('k8sWorkloads', space ? { spaceId: space.id } : { clusterId: c?.id }, { refetchInterval: 3000 });
   const [ns, setNs] = useState('all');
   const [deploying, setDeploying] = useState(false);
   const [scaleW, setScaleW] = useState<K8sWorkload | null>(null);
@@ -139,18 +159,22 @@ export function WorkloadsTab({ cluster: c, topology, onDeployed }: { cluster: K8
   const [showSystem, setShowSystem] = useState(false);
   const pro = usePro();
 
+  // spaces: derived pods from the API, synthesized from replica counts as a fallback
+  const spacePods = useGet<{ items: K8sPod[] }>(['k8sWorkloads', 'spacePods', space?.id], space ? `/k8sSpaces/${space.id}/pods` : null, { refetchInterval: 3000 });
+  const spaceTopology = useMemo(() => (space ? { pods: spacePods.data?.items ?? (spacePods.isError ? workloads.flatMap(synthPods) : []), events: [] } : undefined), [space, workloads, spacePods.data, spacePods.isError]);
+  const topo = space ? spaceTopology : topology;
   const podsByWl = useMemo(() => {
     const m = new Map<string, K8sPod[]>();
-    for (const p of topology?.pods ?? []) { const l = m.get(p.workloadId); if (l) l.push(p); else m.set(p.workloadId, [p]) }
+    for (const p of topo?.pods ?? []) { const l = m.get(p.workloadId); if (l) l.push(p); else m.set(p.workloadId, [p]) }
     return m;
-  }, [topology]);
-  const isSystem = (w: K8sWorkload) => !!w.managedBy || w.namespace === 'kube-system';
+  }, [topo]);
+  const isSystem = (w: K8sWorkload) => !space && (!!w.managedBy || w.namespace === 'kube-system');
   const visible = workloads.filter((w) => showSystem || !isSystem(w));
   const namespaces = [...new Set(workloads.map((w) => w.namespace))].sort();
   const nsCounts = new Map<string, number>();
   for (const w of visible) nsCounts.set(w.namespace, (nsCounts.get(w.namespace) ?? 0) + 1);
   const rows = visible.filter((w) => ns === 'all' || w.namespace === ns);
-  const deployable = c.status !== 'provisioning' && c.status !== 'deleting' && c.status !== 'error';
+  const deployable = space ? space.status === 'active' || space.status === 'resizing' : !!c && c.status !== 'provisioning' && c.status !== 'deleting' && c.status !== 'error';
 
   const restart = useApiMutation((w: K8sWorkload) => api.action('k8sWorkloads', w.id, 'restart', {}), { success: (_r, w) => `Rolling restart of ${w.name}` });
   const remove = async (list: K8sWorkload[]) => {
@@ -222,7 +246,7 @@ export function WorkloadsTab({ cluster: c, topology, onDeployed }: { cluster: K8
         defaultSort={{ id: 'name', dir: 'asc' }}
         toolbar={<>
           {(pro || nsCounts.size > 1) && <FilterChips value={ns} onChange={setNs} options={[{ value: 'all', label: 'All namespaces', count: visible.length }, ...[...nsCounts.entries()].sort().map(([n, count]) => ({ value: n, label: n, count }))]} />}
-          {pro && <Button size="sm" variant="ghost" onClick={() => setShowSystem(!showSystem)}>{showSystem ? 'Hide' : 'Show'} system</Button>}
+          {pro && !space && <Button size="sm" variant="ghost" onClick={() => setShowSystem(!showSystem)}>{showSystem ? 'Hide' : 'Show'} system</Button>}
           <Button size="sm" variant="primary" icon={Rocket} disabled={!deployable} onClick={() => setDeploying(true)}>Deploy</Button>
         </>}
         rowActions={(w) => (
@@ -238,12 +262,12 @@ export function WorkloadsTab({ cluster: c, topology, onDeployed }: { cluster: K8
           { label: 'Restart', icon: RotateCw, onClick: async (list) => { await Promise.allSettled(list.filter((w) => w.kind !== 'CronJob').map((w) => api.action('k8sWorkloads', w.id, 'restart', {}))); toast.success(`Restarting ${list.length} workload(s)`) } },
           { label: 'Delete', icon: Trash2, danger: true, onClick: remove },
         ]}
-        empty={{ icon: Box, title: 'No workloads here', description: 'Deploy a container image — the scheduler places its pods on your nodes.', action: deployable ? <Button variant="primary" icon={Rocket} onClick={() => setDeploying(true)}>Deploy workload</Button> : undefined }}
+        empty={{ icon: Box, title: 'No workloads here', description: space ? 'Deploy a container image, or use kubectl with the kubeconfig from the Access tab.' : 'Deploy a container image — the scheduler places its pods on your nodes.', action: deployable ? <Button variant="primary" icon={Rocket} onClick={() => setDeploying(true)}>Deploy workload</Button> : undefined }}
       />
-      <DeployWorkloadModal cluster={c} open={deploying} onClose={() => setDeploying(false)} namespaces={namespaces.length ? namespaces : ['default']} onDeployed={() => onDeployed()} />
-      <ScaleModal c={c} w={scaleW} onClose={() => setScaleW(null)} />
+      <DeployWorkloadModal cluster={c} space={space} spaceUsed={spaceUsed} onResize={onResize} open={deploying} onClose={() => setDeploying(false)} namespaces={namespaces.length ? namespaces : ['default']} onDeployed={() => onDeployed()} />
+      <ScaleModal c={c} space={space} spaceUsed={spaceUsed} w={scaleW} onClose={() => setScaleW(null)} />
       <ImageModal w={imageW} onClose={() => setImageW(null)} />
-      <WorkloadDrawer c={c} w={detailW} topology={topology} onClose={() => setDetail(null)} />
+      <WorkloadDrawer c={{ name: c?.name ?? space?.name ?? '' }} w={detailW} topology={topo} onClose={() => setDetail(null)} />
     </div>
   );
 }

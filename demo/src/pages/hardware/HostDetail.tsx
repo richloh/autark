@@ -224,12 +224,14 @@ function StatusBanner({ h, busy, actions, onHealth }: { h: BareMetalHost; busy: 
 
 /* ------------------------------------------------------------------ overview */
 
-type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb';
+type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb' | 'platform' | 'platform-cp';
 const MANAGED: Record<ManagedKind, { color: string; label: string; legend: string; link: (id: string) => string }> = {
   db: { color: '#3b82f6', label: 'Managed database', legend: 'Managed databases', link: (id) => `/managed-services/db/${id}` },
   k8s: { color: '#326ce5', label: 'Kubernetes worker node', legend: 'Kubernetes workers', link: (id) => `/managed-services/kubernetes/${id}` },
   'k8s-cp': { color: '#0891b2', label: 'Kubernetes control plane', legend: 'Control planes', link: (id) => `/managed-services/kubernetes/${id}` },
   lb: { color: '#c026d3', label: 'Load balancer node', legend: 'Load balancers', link: (id) => `/managed-services/load-balancers/${id}` },
+  platform: { color: '#0ea5e9', label: 'Platform cluster node (shared Kubernetes)', legend: 'Platform clusters', link: (id) => `/hardware/platform-clusters/${id}?tab=nodes` },
+  'platform-cp': { color: '#0369a1', label: 'Platform cluster control plane', legend: 'Platform control planes', link: (id) => `/hardware/platform-clusters/${id}?tab=nodes` },
 };
 
 function CapacityCard({ h, projects }: { h: BareMetalHost; projects: Map<string, Project> }) {

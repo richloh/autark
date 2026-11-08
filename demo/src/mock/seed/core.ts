@@ -121,7 +121,7 @@ export function seedCore() {
     al('proj-s4', 'SAP S4', 2500, { vcpus: 96, ramGB: 768, vms: 8, volumesGB: 6000, dbInstances: 1, k8sClusters: 0, buckets: 2, publicIps: 1 }, ['dc1'],
       { allowedServices: ['compute', 'network', 'storage', 'objectStorage', 'dns'], alertThresholds: [50, 80, 100] }),
     al('proj-website', 'Website', 350, { vcpus: 16, ramGB: 48, vms: 5, volumesGB: 500, dbInstances: 1, k8sClusters: 0, buckets: 2, publicIps: 3 }, ['dc2', 'dc1', 'aws-eu-central-1'],
-      { allowedServices: ['compute', 'network', 'storage', 'db', 'objectStorage', 'dns', 'loadBalancers'] }),
+      { allowedServices: ['compute', 'network', 'storage', 'db', 'k8s', 'objectStorage', 'dns', 'loadBalancers'] }),
     al('proj-tools', 'Interne Tools', 1300, { vcpus: 64, ramGB: 192, vms: 12, volumesGB: 8000, dbInstances: 1, k8sClusters: 1, buckets: 4, publicIps: 4 }, ['dc1', 'dc2', 'hetzner-fsn1', 'hetzner-nbg1']),
     al('proj-enneo-regiocom', 'Regiocom prod', BUDGET_EP, { vcpus: 16, ramGB: 32, vms: 4, volumesGB: 500, dbInstances: 0, k8sClusters: 2, buckets: 0, publicIps: 8 }, ['dc1'],
       { allowedServices: ['compute', 'network', 'k8s', 'dns'] }),

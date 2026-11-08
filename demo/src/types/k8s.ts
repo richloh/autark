@@ -94,6 +94,8 @@ export interface K8sWorkload {
   gpuPerPod?: number;
   /** taint keys tolerated by the pods */
   tolerations?: string[];
+  /** set when the workload runs in a shared-cluster space (clusterId is then the platform cluster) */
+  spaceId?: ID;
   /** must run on nodes carrying these labels */
   nodeSelector?: Tag[];
   /** CronJob schedule */
@@ -240,3 +242,90 @@ export const K8S_ADDONS: K8sAddon[] = [
   { id: 'gpuOperator', name: 'NVIDIA GPU Operator', category: 'gpu', version: 'v24.6.2', namespace: 'gpu-operator', description: 'Drivers, device plugin and DCGM metrics for GPU node pools.',
     workloads: [{ namespace: 'gpu-operator', name: 'nvidia-device-plugin', kind: 'DaemonSet', image: 'nvcr.io/nvidia/k8s-device-plugin:v0.16.2', replicas: 0, cpuRequestM: 50, memRequestMi: 64, tolerations: ['nvidia.com/gpu'], nodeSelector: [{ key: 'nvidia.com/gpu.present', value: 'true' }] }] },
 ];
+
+/* ------------------------------------------------------------------------------------------------
+ * Shared Kubernetes ("namespace-as-a-service"): the provider operates multi-tenant PLATFORM CLUSTERS;
+ * customers get a SPACE = namespace + ResourceQuota + namespaced kubectl access on one of them.
+ *
+ * REST contract (mock API, /api/v1):
+ *   platformClusters   GET list/get (global, all accounts see the ones they may use; admin UI sees all)
+ *                      POST create (admin) · PATCH (name, description, maintenanceWindow)
+ *                      actions: updatePolicy {access, overcommit, maxTenantQuota, podSecurity, storageClasses, acceptingTenants}
+ *                               scalePool {poolId, count} · upgrade {version} · drainNode {node}
+ *   GET  /platformClusters/:id/tenants      → { items: SpaceSummary[] } (spaces on this cluster, all accounts)
+ *   k8sSpaces          GET list/get (scoped to account/project) · POST create · PATCH (name, tags, team)
+ *                      DELETE (async op; deletes namespace + workloads)
+ *                      actions: resize {quota} · rotateCredentials · suspend · resume (admin) · move {platformClusterId} (admin)
+ *   GET  /k8sSpaces/placement-preview?locationId&cpuCores&memoryGi&storageGi&projectId
+ *        → { chosen: PlatformClusterCandidate | null, candidates: PlatformClusterCandidate[], why }
+ *   GET  /k8sSpaces/:id/kubeconfig          → { yaml, server, namespace, user }
+ *   GET  /k8sSpaces/:id/usage               → { quota, used: SpaceQuota, pods: {used, max} }   (used = sum of workload requests)
+ *   k8sWorkloads       existing collection; a workload in a space has `spaceId` set and clusterId = platform cluster id,
+ *                      namespace = space.namespace. POST with {spaceId,…} enforces the space quota (422 quota_exceeded).
+ * ---------------------------------------------------------------------------------------------- */
+
+export interface SpaceQuota {
+  cpuCores: number;   // requests.cpu (cores)
+  memoryGi: number;   // requests.memory
+  storageGi: number;  // requests.storage (PVCs)
+  pods: number;       // max pods
+  loadBalancers: number; // Service type=LoadBalancer / ingress endpoints
+}
+
+export interface PlatformCluster {
+  id: ID;
+  name: string;               // e.g. "shared-mdg-1"
+  description: string;
+  locationId: ID;
+  version: string;            // "1.31"
+  status: 'running' | 'upgrading' | 'degraded' | 'provisioning';
+  endpoint: string;           // API server URL tenants use
+  ingressDomain: string;      // wildcard base, e.g. "k8s.mdg.autark.cloud" → <space>.<project>.k8s…
+  nodePools: NodePool[];      // runs on bare-metal hosts with roles k8s-worker / k8s-control-plane
+  controlPlane: { ha: boolean; size: 'small' | 'medium' | 'large' };
+  cni: 'cilium' | 'calico';
+  /** who may place spaces here (same semantics as host access) */
+  access: { mode: 'all' | 'restricted'; accountIds: ID[]; projectIds: ID[] };
+  /** quota may be promised up to allocatable × overcommit */
+  overcommit: { cpu: number; memory: number };
+  maxTenantQuota: SpaceQuota;
+  podSecurity: 'baseline' | 'restricted';
+  storageClasses: string[];
+  acceptingTenants: boolean;  // false = cordoned for new spaces
+  maintenanceWindow: { day: string; hour: number };
+  createdAt: ISODate;
+  tags: Tag[];
+  /** decorated on read */
+  capacity?: { cpuCores: number; memoryGi: number };            // allocatable of all worker nodes
+  promised?: { cpuCores: number; memoryGi: number; spaces: number }; // sum of tenant quotas
+  used?: { cpuCores: number; memoryGi: number; pods: number };   // sum of workload requests
+}
+
+export interface K8sSpace {
+  id: ID;
+  name: string;               // e.g. "website"
+  accountId: ID;
+  projectId: ID;
+  platformClusterId: ID;
+  locationId: ID;
+  namespace: string;          // e.g. "regiocom-website" (unique per platform cluster)
+  quota: SpaceQuota;
+  tier: 'namespace';          // future: 'vcluster' | 'dedicated-pool' (shown as coming soon)
+  status: 'provisioning' | 'active' | 'resizing' | 'suspended' | 'deleting' | 'error';
+  ingressHost: string;        // e.g. "*.website.regiocom.k8s.mdg.autark.cloud"
+  team: { userIds: ID[]; role: 'edit' | 'view' }[]; // namespaced RBAC bindings (OIDC)
+  serviceAccount: string;     // kubectl identity in the kubeconfig
+  networkPolicy: 'default-deny' | 'allow-same-namespace';
+  createdAt: ISODate;
+  tags: Tag[];
+  /** decorated on read */
+  used?: SpaceQuota;
+  monthlyCost?: number;
+}
+
+export interface PlatformClusterCandidate {
+  id: ID; name: string; locationId: ID; version: string;
+  fits: boolean; reason: string | null;
+  free: { cpuCores: number; memoryGi: number }; // promisable headroom (capacity × overcommit − promised)
+  tenants: number;
+}

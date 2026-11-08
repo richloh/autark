@@ -14,7 +14,9 @@ import { money, num } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import { Pro } from '@/components/ui/Pro';
 import { usePro } from '@/store/ui';
-import { K8S_VERSIONS, type K8sCluster, type Location, type Operation, type Project } from '@/types';
+import { Tabs, useTabParam } from '@/components/ui/Tabs';
+import { SpacesTable } from '@/components/k8s/spaces/SpacesTable';
+import { K8S_VERSIONS, type K8sSpace, type K8sCluster, type Location, type Operation, type Project } from '@/types';
 
 const TRANSITIONAL: K8sCluster['status'][] = ['provisioning', 'upgrading', 'scaling', 'deleting'];
 
@@ -66,10 +68,9 @@ function UtilCell({ c }: { c: K8sCluster }) {
   );
 }
 
-export default function K8sList() {
+function ClustersSection({ clusters, isLoading }: { clusters: K8sCluster[]; isLoading: boolean }) {
   const [sp] = useSearchParams();
   const pro = usePro();
-  const { items: clusters, isLoading } = useList<K8sCluster>('k8sClusters');
   const { map: projects } = useLookup<Project>('projects');
   const { map: locations } = useLookup<Location>('locations');
   const { items: ops } = useList<Operation>('operations', { status: 'running' });
@@ -139,14 +140,7 @@ export default function K8sList() {
   const columns: Column<K8sCluster>[] = allColumns.filter((col) => pro || !col.pro);
 
   return (
-    <Page wide>
-      <PageHeader
-        title="Kubernetes"
-        description={pro ? 'Managed, upstream Kubernetes on your own hardware — HA control planes, autoscaling node pools and one-click upgrades.' : 'Managed Kubernetes clusters with one-click upgrades.'}
-        icon={Boxes}
-        iconColor="#326ce5"
-        actions={<Button variant="primary" icon={Plus} to="/managed-services/kubernetes/new">Create cluster</Button>}
-      />
+    <>
       <Pro>
       <div className="mb-5 grid grid-cols-2 gap-3 @min-[44rem]:grid-cols-4">
         <Stat label="Clusters" value={`${counts.running} / ${counts.all}`} icon={Boxes} sub={counts.upgrade ? <span className="text-brand-600 dark:text-brand-300">{counts.upgrade} upgrade{counts.upgrade > 1 ? 's' : ''} available</span> : 'all up to date'} />
@@ -180,8 +174,44 @@ export default function K8sList() {
           ]} />
         )}
         bulkActions={[{ label: 'Delete', icon: Trash2, danger: true, onClick: async (list) => { for (const c of list) await deleteCluster(c) } }]}
-        empty={{ icon: Boxes, title: 'No Kubernetes clusters yet', description: 'Spin up a conformant cluster with autoscaling node pools in a few minutes.', action: <Button variant="primary" icon={Plus} to="/managed-services/kubernetes/new">Create cluster</Button> }}
+        empty={{ icon: Boxes, title: 'No Kubernetes clusters yet', description: 'A whole cluster just for you: full control incl. CRDs, operators and node pools. Ready in a few minutes.', action: <Button variant="primary" icon={Plus} to="/managed-services/kubernetes/new?type=dedicated">Create cluster</Button> }}
       />
+    </>
+  );
+}
+
+export default function K8sList() {
+  const pro = usePro();
+  const { items: clusters, isLoading, isSuccess: clustersLoaded } = useList<K8sCluster>('k8sClusters');
+  const spacesQ = useList<K8sSpace>('k8sSpaces');
+  const spaces = spacesQ.items;
+  const spacesLoaded = spacesQ.isSuccess || spacesQ.isError;
+  // simple mode: shared spaces first; pro: own clusters first. Open the non-empty one when the preferred is empty.
+  const order: ('spaces' | 'clusters')[] = pro ? ['clusters', 'spaces'] : ['spaces', 'clusters'];
+  const count = { spaces: spaces.length, clusters: clusters.length };
+  const preferred = clustersLoaded && spacesLoaded && count[order[0]] === 0 && count[order[1]] > 0 ? order[1] : order[0];
+  const [tabParam, setTab] = useTabParam(preferred, 'view');
+  const tab = tabParam === 'clusters' || tabParam === 'spaces' ? tabParam : preferred;
+  const label = { spaces: 'Shared spaces', clusters: 'Own clusters' };
+
+  return (
+    <Page wide>
+      <PageHeader
+        title="Kubernetes"
+        description={pro ? 'Shared spaces on provider-operated clusters, or your own managed, upstream clusters with HA control planes and autoscaling node pools.' : 'Run apps in a shared space, or get a cluster of your own.'}
+        icon={Boxes}
+        iconColor="#326ce5"
+        actions={tab === 'spaces'
+          ? <Button variant="primary" icon={Plus} to="/managed-services/kubernetes/new?type=shared">Create space</Button>
+          : <Button variant="primary" icon={Plus} to="/managed-services/kubernetes/new?type=dedicated">Create cluster</Button>}
+      />
+      <Tabs className="mb-5" value={tab} onChange={setTab} tabs={order.map((id) => ({
+        id, label: label[id], count: (id === 'spaces' ? spacesLoaded : clustersLoaded) ? count[id] : undefined,
+        icon: id === 'spaces' ? <Box className="size-3.5" /> : <Boxes className="size-3.5" />,
+      }))} />
+      {tab === 'spaces'
+        ? <SpacesTable spaces={spaces} loading={spacesQ.isLoading} error={spacesQ.isError} />
+        : <ClustersSection clusters={clusters} isLoading={isLoading} />}
     </Page>
   );
 }

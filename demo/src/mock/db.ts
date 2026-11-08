@@ -2,7 +2,7 @@ import { emit } from './bus';
 
 export type Row = { id: string; [k: string]: any };
 
-const STORAGE_KEY = 'autark.mockdb.v5';
+const STORAGE_KEY = 'autark.mockdb.v7';
 
 /**
  * Tiny document store for the mock backend. Collections are Maps of rows; everything is persisted

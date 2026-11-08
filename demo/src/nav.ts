@@ -49,6 +49,7 @@ export const NAV: NavGroup[] = [
     label: 'Hardware',
     items: [
       { label: 'Bare Metal Hosts', path: '/hardware/bare-metals', icon: Cpu, keywords: 'servers racks hypervisors', pro: true },
+      { label: 'Platform Clusters', path: '/hardware/platform-clusters', icon: Boxes, keywords: 'shared kubernetes multi-tenant namespaces spaces', pro: true },
       { label: 'Cloud Providers', path: '/hardware/cloud-providers', icon: Cloud, keywords: 'hetzner aws ovh burst', pro: true },
     ],
   },

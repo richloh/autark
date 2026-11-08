@@ -10,7 +10,7 @@ import type { BareMetalHost, VM, IpAddress, IpPool, Firewall, Ref, ProjectAllowa
 /* ---------------------------------------------------------------- hosts / placement */
 
 /** Kind of a managed workload placed on a host (besides VMs). */
-export type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb';
+export type ManagedKind = 'db' | 'k8s' | 'k8s-cp' | 'lb' | 'platform' | 'platform-cp';
 export interface ManagedItem { kind: ManagedKind; id: string; name: string; vcpus: number; ramGB: number; gpus: number; projectId?: string; role: HostRole }
 
 /** Lookup names for policy reasons ("Reserved for SAP IS/U"). */
@@ -35,6 +35,7 @@ export const LB_NODE = { count: 2, vcpus: 2, ramGB: 4 };
  *  - Kubernetes worker nodes (role k8s-worker; GPU pools → GPU hosts)
  *  - Kubernetes control planes (role k8s-control-plane; 1 replica, 3 when HA)
  *  - load balancer nodes (role load-balancer; 2 per LB)
+ *  - shared platform cluster nodes (k8s-worker / k8s-control-plane; provider-owned → open hosts only)
  * Workloads with no eligible host are skipped. `override` lets callers simulate a policy change.
  */
 export function managedPlacements(override?: Map<string, Pick<BareMetalHost, 'roles' | 'access'>>): Map<string, ManagedItem[]> {
@@ -81,6 +82,20 @@ export function managedPlacements(override?: Map<string, Pick<BareMetalHost, 'ro
       const atLoc = workers.filter((h) => (wantsGpu ? h.gpus.length > 0 : !h.gpus.length));
       if (!atLoc.length) continue;
       spread(atLoc, k.id + p.id, p.count).forEach((h, i) => add(h.id, { kind: 'k8s', id: k.id, name: `${k.name}/${p.name}-${i + 1}`, vcpus: p.vcpus, ramGB: p.ramGB, gpus: p.gpu?.count ?? 0, projectId: k.projectId, role: 'k8s-worker' }));
+    }
+  }
+  // shared platform clusters are provider-owned: only hosts open to all accounts (access mode 'all')
+  for (const pc of db.list<any>('platformClusters')) {
+    const cpAll = eligible(pc.locationId, 'k8s-control-plane', {}).filter((h) => !h.gpus.length);
+    if (cpAll.length) {
+      const size = CP_SIZE[pc.controlPlane?.size] ?? CP_SIZE.medium;
+      spread(cpAll, `${pc.id}-cp`, pc.controlPlane?.ha ? 3 : 1).forEach((h, i) => add(h.id, { kind: 'platform-cp', id: pc.id, name: `${pc.name}/control-plane-${i + 1}`, vcpus: size.vcpus, ramGB: size.ramGB, gpus: 0, role: 'k8s-control-plane' }));
+    }
+    const workers = eligible(pc.locationId, 'k8s-worker', {}).filter((h) => !h.gpus.length);
+    if (!workers.length) continue;
+    for (const p of pc.nodePools ?? []) {
+      const n = Math.max(p.count, p.targetCount ?? 0); // joining nodes reserve capacity too
+      spread(workers, pc.id + p.id, n).forEach((h, i) => add(h.id, { kind: 'platform', id: pc.id, name: `${pc.name}/${p.name}-${i + 1}`, vcpus: p.vcpus, ramGB: p.ramGB, gpus: 0, role: 'k8s-worker' }));
     }
   }
   for (const lb of db.list<any>('loadBalancers')) {

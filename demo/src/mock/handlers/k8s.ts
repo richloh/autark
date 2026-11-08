@@ -7,6 +7,7 @@ import { locationOrThrow, checkQuota, checkRequiredTags, checkLocationAllowed } 
 import { parseCidr, intToIp, cidrOverlaps, isValidCidr } from '@/lib/cidr';
 import { hashString, mulberry32, noise } from '@/lib/random';
 import { seedK8s } from '../seed/k8s';
+import { createSpaceWorkload, afterCreateSpaceWorkload, removeSpaceWorkload, spaceWorkloadAction, decorateSpaceWorkload } from './k8sShared';
 import {
   K8S_VERSIONS, K8S_NODE_PRESETS, K8S_ADDONS, k8sNextVersion, k8sPatch,
   type K8sCluster, type K8sWorkload, type NodePool, type K8sNode, type K8sPod, type K8sEvent, type K8sTopology, type K8sClusterSummary,
@@ -868,6 +869,7 @@ function decorateCluster(c: K8sCluster): K8sCluster {
 }
 
 function decorateWorkload(w: K8sWorkload): K8sWorkload {
+  if (w.spaceId) return decorateSpaceWorkload(w); // shared-cluster space (k8sShared.ts)
   const c = db.get<K8sCluster>('k8sClusters', w.clusterId);
   if (!c) return w;
   const pods = computeTopology(c).pods.filter((p) => p.workloadId === w.id);
@@ -1075,11 +1077,12 @@ export function registerK8s() {
   defineCollection<K8sWorkload>({
     name: 'k8sWorkloads', kind: 'k8sWorkload', idPrefix: 'wl',
     searchText: (w) => `${w.id} ${w.namespace}/${w.name} ${w.name} ${w.image} ${w.kind}`,
-    subtitle: (w) => `${w.kind} · ${w.namespace} · ${db.get<K8sCluster>('k8sClusters', w.clusterId)?.name ?? w.clusterId}`,
-    link: (w) => `/managed-services/kubernetes/${w.clusterId}?tab=workloads&q=${encodeURIComponent(w.name)}`,
+    subtitle: (w) => `${w.kind} · ${w.namespace} · ${db.get<K8sCluster>('k8sClusters', w.clusterId)?.name ?? db.get<any>('platformClusters', w.clusterId)?.name ?? w.clusterId}`,
+    link: (w) => (w.spaceId ? `/managed-services/kubernetes/spaces/${w.spaceId}?tab=workloads&q=${encodeURIComponent(w.name)}` : `/managed-services/kubernetes/${w.clusterId}?tab=workloads&q=${encodeURIComponent(w.name)}`),
     decorate: decorateWorkload,
     sort: (a, b) => a.namespace.localeCompare(b.namespace) || a.name.localeCompare(b.name),
-    create: (_ctx, body) => {
+    create: (ctx, body) => {
+      if (body.spaceId) return createSpaceWorkload(ctx, body); // quota-enforced workload in a shared space
       const c = getOr404<K8sCluster>('k8sClusters', body.clusterId ?? '', 'Kubernetes cluster');
       if (c.status !== 'running' && c.status !== 'scaling' && c.status !== 'upgrading' && c.status !== 'degraded') throw new ApiError(409, `Cannot deploy to a cluster that is ${c.status}`, 'invalid_state');
       validateWorkload(c, body);
@@ -1092,6 +1095,7 @@ export function registerK8s() {
       } satisfies K8sWorkload;
     },
     afterCreate: (ctx, w) => {
+      if (w.spaceId) return afterCreateSpaceWorkload(ctx, w);
       const c = db.get<K8sCluster>('k8sClusters', w.clusterId)!;
       audit(ctx, 'k8s.deployWorkload', { type: 'k8s', id: c.id, name: c.name }, { ...scopeOf(c), details: `${w.kind} ${w.namespace}/${w.name} (${w.image}, ${w.replicas}× ${w.cpuRequestM}m/${w.memRequestMi}Mi)` });
       if (w.kind === 'CronJob') {
@@ -1113,6 +1117,7 @@ export function registerK8s() {
       return next;
     },
     remove: (ctx, w) => {
+      if (w.spaceId) return removeSpaceWorkload(ctx, w);
       if (w.managedBy) throw new ApiError(409, `${w.name} is managed by the ${K8S_ADDONS.find((a) => a.id === w.managedBy)?.name ?? w.managedBy} add-on. Uninstall the add-on instead.`, 'managed');
       if (w.namespace === 'kube-system') throw new ApiError(409, 'System workloads in kube-system cannot be deleted from the console', 'protected');
       if (w.status === 'Terminating') throw new ApiError(409, 'Workload is already being deleted', 'invalid_state');
@@ -1132,6 +1137,7 @@ export function registerK8s() {
     },
     actions: {
       scale: (ctx, w, body) => {
+        if (w.spaceId) return spaceWorkloadAction(ctx, w, 'scale', body);
         if (w.kind === 'DaemonSet' || w.kind === 'CronJob') throw new ApiError(409, `A ${w.kind} cannot be scaled`, 'invalid_state');
         const c = clusterFor(w);
         workloadIdle(w);
@@ -1155,6 +1161,7 @@ export function registerK8s() {
         return decorateWorkload(db.get<K8sWorkload>('k8sWorkloads', w.id)!);
       },
       restart: (ctx, w, body) => {
+        if (w.spaceId) return spaceWorkloadAction(ctx, w, 'restart', body);
         if (w.kind === 'CronJob') throw new ApiError(409, 'CronJobs are not restarted — trigger a run instead', 'invalid_state');
         const c = clusterFor(w);
         workloadIdle(w);

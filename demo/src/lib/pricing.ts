@@ -134,3 +134,15 @@ export function dnsZoneCost(records: number): CostBreakdown {
     { label: `${records} records`, amount: r2(records * PRICING.dns.recordPerMonth) },
   ]);
 }
+
+/** Shared Kubernetes space: billed by reserved quota (no control-plane or node fees). */
+export const SPACE_PRICING = { cpuCorePerMonth: 9, memoryGiPerMonth: 1.6, storageGiPerMonth: 0.1, loadBalancerPerMonth: 6 };
+export function spaceCost(q: { cpuCores: number; memoryGi: number; storageGi: number; loadBalancers: number }): CostBreakdown {
+  const p = SPACE_PRICING;
+  return breakdown([
+    { label: `${q.cpuCores} CPU cores reserved`, amount: r2(q.cpuCores * p.cpuCorePerMonth) },
+    { label: `${q.memoryGi} GiB memory reserved`, amount: r2(q.memoryGi * p.memoryGiPerMonth) },
+    { label: `${q.storageGi} GiB persistent storage`, amount: r2(q.storageGi * p.storageGiPerMonth) },
+    ...(q.loadBalancers ? [{ label: `${q.loadBalancers}× load balancer endpoint`, amount: r2(q.loadBalancers * p.loadBalancerPerMonth) }] : []),
+  ]);
+}

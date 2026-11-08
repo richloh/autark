@@ -21,6 +21,8 @@ import { k8sCost, PRICING } from '@/lib/pricing';
 import { cidrOverlaps, isValidCidr } from '@/lib/cidr';
 import { money, num } from '@/lib/format';
 import { cn } from '@/lib/cn';
+import { ClusterTypeChooser, type ClusterType } from '@/components/k8s/spaces/ClusterTypeChooser';
+import { SpaceCreateForm } from '@/components/k8s/spaces/SpaceCreateForm';
 import { K8S_VERSIONS, K8S_ADDONS, K8S_NODE_PRESETS, type Network, type ProjectAllowance, type K8sAddon } from '@/types';
 
 const CATEGORY_ICON: Record<K8sAddon['category'], typeof Shield> = { networking: Globe2, security: ShieldCheck, observability: Activity, delivery: GitBranch, storage: HardDrive, gpu: Gpu };
@@ -30,7 +32,7 @@ const CP_SIZES = [
   { value: 'large' as const, title: 'Large', description: 'Up to 500 nodes · 8 vCPU / 32 GB, dedicated etcd' },
 ];
 
-export default function K8sCreate() {
+function DedicatedClusterForm() {
   const navigate = useNavigate();
   const pro = usePro();
   const [sp] = useSearchParams();
@@ -247,9 +249,7 @@ export default function K8sCreate() {
   const advancedNeeded = advancedErrorKeys.length > 0 || !!podErr || !!svcErr || !poolsValid;
 
   return (
-    <Page wide>
-      <PageHeader title="Create Kubernetes cluster" description={pro ? 'Upstream, CNCF-conformant Kubernetes. Autark runs the control plane; you pick the nodes.' : 'Autark runs Kubernetes for you. You pick the nodes.'}
-        icon={Boxes} iconColor="#326ce5" crumbs={[{ label: 'Kubernetes', to: '/managed-services/kubernetes' }, { label: 'Create' }]} />
+    <>
       {formError && <Hint tone="danger" className="mb-5">{formError}</Hint>}
 
       <CreateLayout needsProject="Kubernetes cluster" aside={<>
@@ -383,6 +383,26 @@ export default function K8sCreate() {
           </>
         )}
       </CreateLayout>
+    </>
+  );
+}
+
+export default function K8sCreate() {
+  const pro = usePro();
+  const [sp, setSp] = useSearchParams();
+  const param = sp.get('type');
+  const type: ClusterType = param === 'dedicated' || param === 'shared' ? param : pro ? 'dedicated' : 'shared';
+  const choose = (t: ClusterType) => { const n = new URLSearchParams(sp); n.set('type', t); setSp(n, { replace: true }) };
+  return (
+    <Page wide>
+      <PageHeader
+        title={type === 'shared' ? 'Create Kubernetes space' : 'Create Kubernetes cluster'}
+        description={type === 'shared'
+          ? (pro ? 'A namespace with a resource quota and namespaced kubectl access on a provider-operated platform cluster.' : 'Run your apps on managed Kubernetes. No cluster to operate.')
+          : (pro ? 'Upstream, CNCF-conformant Kubernetes. Autark runs the control plane; you pick the nodes.' : 'Autark runs Kubernetes for you. You pick the nodes.')}
+        icon={Boxes} iconColor="#326ce5" crumbs={[{ label: 'Kubernetes', to: '/managed-services/kubernetes' }, { label: 'Create' }]} />
+      <ClusterTypeChooser value={type} onChange={choose} />
+      {type === 'shared' ? <SpaceCreateForm key="shared" /> : <DedicatedClusterForm key="dedicated" />}
     </Page>
   );
 }

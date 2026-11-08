@@ -264,7 +264,7 @@ export interface PolicyImpact {
 }
 
 const rawTB = (h: BareMetalHost) => Math.round(h.disks.reduce((a, d) => a + d.sizeGB, 0) / 100) / 10;
-const KIND_LABEL: Record<PolicyViolation['kind'], string> = { vm: 'VM', db: 'Database', k8s: 'Kubernetes worker', 'k8s-cp': 'Kubernetes control plane', lb: 'Load balancer', storage: 'Ceph storage' };
+const KIND_LABEL: Record<PolicyViolation['kind'], string> = { vm: 'VM', db: 'Database', k8s: 'Kubernetes worker', 'k8s-cp': 'Kubernetes control plane', lb: 'Load balancer', storage: 'Ceph storage', platform: 'Platform cluster worker', 'platform-cp': 'Platform cluster control plane' };
 
 /** What a new policy would mean for workloads already on the host (nothing is changed). */
 function policyImpact(h: BareMetalHost, roles: HostRole[], access: HostAccess): PolicyImpact {

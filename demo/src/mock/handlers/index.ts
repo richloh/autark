@@ -5,6 +5,7 @@ import { registerNetwork } from './network';
 import { registerDatabases } from './databases';
 import { registerLoadBalancers } from './loadbalancers';
 import { registerK8s } from './k8s';
+import { registerK8sShared } from './k8sShared';
 import { registerStorage } from './storage';
 import { registerHardware } from './hardware';
 import { registerIam } from './iam';
@@ -22,6 +23,7 @@ export function registerAllHandlers() {
   registerDatabases();
   registerLoadBalancers();
   registerK8s();
+  registerK8sShared();
   registerStorage();
   registerHardware();
   registerIam();
