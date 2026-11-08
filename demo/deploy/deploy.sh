@@ -1,43 +1,25 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Build the Autark demo container locally and roll it out to lohwasser.de (served at autark.lohwasser.de
+# via the caddy-docker-proxy running there). The image is shipped over SSH — no registry needed.
+set -euo pipefail
 
-set -e  # Exit on any error
+IMAGE="autark-demo:latest"
+REMOTE="${REMOTE:-richard@lohwasser.de}"
+REMOTE_PATH="${REMOTE_PATH:-/apps/autark}"
 
-# Configuration
-IMAGE_NAME="richloh/repo:autark-demo"
-REMOTE_HOST="root@lohwasser.de"
-REMOTE_PATH="/root/autark-demo"
-COMPOSE_FILE="docker-compose.yml"
-
-echo "========================================="
-echo "Starting deployment process..."
-echo "========================================="
-
-# Prep: Change working directory to the script's location
 cd "$(dirname "$0")"
 
-# Step 1: Build the Docker image
-echo ""
-echo "[1/4] Building Docker image: $IMAGE_NAME"
-docker build --build-arg SITE_URL=https://autark-demo.tmt-labs.de -t "$IMAGE_NAME" ..
+echo "[1/4] Building image $IMAGE"
+docker build -t "$IMAGE" ..
 
-# Step 2: Push the image to Docker Hub
-echo ""
-echo "[2/4] Pushing image to Docker Hub..."
-docker push "$IMAGE_NAME"
+echo "[2/4] Shipping image to $REMOTE"
+docker save "$IMAGE" | gzip | ssh "$REMOTE" "gunzip | docker load"
 
-# Step 3: Copy docker-compose.yml to remote server
-echo ""
-echo "[3/4] Copying docker-compose.yml to $REMOTE_HOST:$REMOTE_PATH"
-ssh "$REMOTE_HOST" "mkdir -p $REMOTE_PATH"
-scp "$COMPOSE_FILE" "$REMOTE_HOST:$REMOTE_PATH/"
+echo "[3/4] Uploading compose file to $REMOTE:$REMOTE_PATH"
+ssh "$REMOTE" "mkdir -p $REMOTE_PATH"
+scp docker-compose.yml "$REMOTE:$REMOTE_PATH/docker-compose.yml"
 
-# Step 4: Start the application with docker compose
-echo ""
-echo "[4/4] Starting application on remote server..."
-ssh "$REMOTE_HOST" "cd $REMOTE_PATH && docker compose pull && docker compose up -d"
+echo "[4/4] Starting container"
+ssh "$REMOTE" "cd $REMOTE_PATH && docker compose up -d --force-recreate && docker image prune -f >/dev/null"
 
-echo ""
-echo "========================================="
-echo "Deployment completed successfully!"
-echo "========================================="
-echo "Application should be running at autark-demo.tmt-labs.de"
+echo "Done → https://autark.lohwasser.de"

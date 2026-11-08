@@ -1,0 +1,119 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Semantic design tokens. Use e.g. bg-surface, text-fg, text-muted, border-line, bg-brand-500 */
+:root {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #f3f4f8;
+  --surface-3: #eceef4;
+  --line: #e4e6ee;
+  --line-strong: #d3d7e2;
+  --fg: #0f1222;
+  --fg-2: #3a3f55;
+  --muted: #6b7086;
+  --faint: #9aa0b4;
+  --ring: #4f6bff55;
+  --shadow: 0 1px 2px rgba(16, 20, 40, 0.04), 0 1px 3px rgba(16, 20, 40, 0.06);
+  --shadow-lg: 0 10px 30px -10px rgba(16, 20, 40, 0.25), 0 4px 12px -4px rgba(16, 20, 40, 0.08);
+  --grid-dot: #d9dce7;
+  --map-land: #c3c9db;
+  color-scheme: light;
+}
+.dark {
+  --bg: #0a0b12;
+  --surface: #11131d;
+  --surface-2: #161927;
+  --surface-3: #1d2132;
+  --line: #232738;
+  --line-strong: #30364d;
+  --fg: #eef0f8;
+  --fg-2: #c3c7d9;
+  --muted: #8b90a8;
+  --faint: #5d6380;
+  --ring: #6d84ff66;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 4px 12px -4px rgba(0, 0, 0, 0.4);
+  --grid-dot: #222639;
+  --map-land: #343b57;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --shadow-card: var(--shadow);
+  --shadow-pop: var(--shadow-lg);
+}
+
+@theme {
+  --color-brand-50: #eef1ff;
+  --color-brand-100: #dfe4ff;
+  --color-brand-200: #c4ccff;
+  --color-brand-300: #9eaaff;
+  --color-brand-400: #7a86ff;
+  --color-brand-500: #5b67f8;
+  --color-brand-600: #4a4fe8;
+  --color-brand-700: #3d3fcc;
+  --color-brand-800: #3336a4;
+  --color-brand-900: #2f3382;
+  --animate-pulse-soft: pulse-soft 2s ease-in-out infinite;
+  --animate-flow: flow 1.2s linear infinite;
+  --animate-in: fade-in 0.18s ease-out;
+  --animate-pop: pop-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  --animate-slide-in: slide-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes pulse-soft { 0%, 100% { opacity: 1 } 50% { opacity: 0.45 } }
+@keyframes flow { to { stroke-dashoffset: -20 } }
+@keyframes fade-in { from { opacity: 0; transform: translateY(2px) } to { opacity: 1; transform: none } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: none } }
+@keyframes slide-in { from { transform: translateX(24px); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes shimmer { 100% { transform: translateX(100%) } }
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+}
+* { border-color: var(--line); }
+::selection { background: #5b67f840; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+
+/* Thin scrollbars */
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+
+.bg-dots {
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.tabular { font-variant-numeric: tabular-nums; }
+.skeleton { position: relative; overflow: hidden; background: var(--surface-3); border-radius: 6px; }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: shimmer 1.4s infinite;
+}
+.dark .skeleton::after { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); }
+.flow-line { stroke-dasharray: 4 6; animation: flow 1.2s linear infinite; }
+
+/* Overlays render into a viewport-sized container (see lib/overlay.ts). */
+#overlay-root { position: fixed; inset: 0; z-index: 70; pointer-events: none; container-type: inline-size; }
+#overlay-root > * { pointer-events: auto; }
+#overlay-root > .pointer-events-none { pointer-events: none; }

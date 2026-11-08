@@ -1,13 +1,11 @@
 services:
-  autark-demo:
-    image: richloh/repo:autark-demo
+  autark:
+    image: autark-demo:latest
     networks:
       - caddy
     labels:
-      caddy: autark-demo.tmt-labs.de
+      caddy: autark.lohwasser.de
       caddy.reverse_proxy: "{{upstreams 4321}}"
-    environment:
-      - SITE_URL=https://autark-demo.tmt-labs.de
     restart: always
 
 networks:

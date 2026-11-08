@@ -1,20 +1,39 @@
 {
-  "name": "autark-astro",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "autark-demo",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Autark — sovereign cloud control plane demo with an in-browser mock backend API",
   "scripts": {
-    "dev": "astro dev",
-    "start": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "vite",
+    "build": "tsc --noEmit -p . && vite build",
+    "typecheck": "tsc --noEmit -p .",
+    "preview": "vite preview --port 4321"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "@astrojs/tailwind": "^6.0.2",
-    "astro": "^5.15.1",
-    "tailwindcss": "^3.4.18"
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@tanstack/react-query": "^5.107.1",
+    "clsx": "^2.1.1",
+    "d3-hierarchy": "^3.1.3",
+    "d3-shape": "^3.2.1",
+    "lucide-react": "^1.70.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-router": "^7.18.5",
+    "tailwind-merge": "^3.7.0",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/d3-hierarchy": "^3.1.7",
+    "@types/d3-shape": "^3.2.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7"
   }
 }

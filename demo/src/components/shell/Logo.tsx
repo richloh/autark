@@ -1,0 +1,15 @@
+export function Logo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 32 32" className={className} aria-hidden>
+      <defs>
+        <linearGradient id="autark-logo" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#22d3ee" />
+          <stop offset="1" stopColor="#6366f1" />
+        </linearGradient>
+      </defs>
+      <rect width="32" height="32" rx="8" fill="url(#autark-logo)" />
+      <path d="M16 6 L26 25 H21.5 L16 14.5 L10.5 25 H6 Z" fill="#fff" />
+      <circle cx="16" cy="21" r="2.2" fill="#fff" />
+    </svg>
+  );
+}

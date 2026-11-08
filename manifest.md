@@ -60,9 +60,9 @@ Autark supports multi‑tenant organizations, projects, and groups; quotas; show
 
 ## Live demo for illustration purposes
 
-A clickable live demo with sample mock data is provided here: [Demo](https://autark-demo.tmt-labs.de/). 
+A clickable live demo with sample mock data is provided here: [Demo](https://autark.lohwasser.de/). 
 
-| [![Dashboard](https://autark-demo.tmt-labs.de/images/autark-dashboard.png)](https://autark-demo.tmt-labs.de/dashboard/) | [![VM Creation](https://autark-demo.tmt-labs.de/images/autark-vm-creation.png)](https://autark-demo.tmt-labs.de/infrastructure/vms/create/) | [![Bare metal machines](https://autark-demo.tmt-labs.de/images/autark-bare-metal-hosts.png)](https://autark-demo.tmt-labs.de/hardware/bare-metals/) |
+| [![Dashboard](https://autark.lohwasser.de/images/autark-dashboard.png)](https://autark.lohwasser.de/dashboard/) | [![VM Creation](https://autark.lohwasser.de/images/autark-vm-creation.png)](https://autark.lohwasser.de/infrastructure/vms/create/) | [![Bare metal machines](https://autark.lohwasser.de/images/autark-bare-metal-hosts.png)](https://autark.lohwasser.de/hardware/bare-metals/) |
 |:---:|:---:|:---:|
 | Dashboard View | Creating a VM | Bare metal machines |
 

@@ -1,0 +1,11 @@
+import type { Tag } from '@/types';
+export const MIN = 60_000;
+export const HOUR = 60 * MIN;
+export const DAY = 24 * HOUR;
+export const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+export const ahead = (ms: number) => new Date(Date.now() + ms).toISOString();
+export const tags = (o: Record<string, string>): Tag[] => Object.entries(o).map(([key, value]) => ({ key, value }));
+export const A = 'acc-myco-a';
+export const B = 'acc-myco-b';
+export const projectAccount: Record<string, string> = { 'proj-app1': A, 'proj-app2': A, 'proj-ml': B, 'proj-infra': B };
+export const scope = (projectId: string) => ({ accountId: projectAccount[projectId], projectId });
