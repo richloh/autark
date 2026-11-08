@@ -13,6 +13,7 @@ import { CostPanel } from '@/components/resource/CostPanel';
 import { PlacementPreview, usePlacement } from '@/components/compute/PlacementPreview';
 import { ProjectField, LocationCards, NetworkSubnetFields, useFirewallOptions } from '@/components/resource/pickers';
 import { OsBadge } from '@/lib/images';
+import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { vmCost } from '@/lib/pricing';
 import { money } from '@/lib/format';
@@ -190,38 +191,32 @@ export default function VmCreate() {
       {errors.locationId && <p className="text-xs text-rose-500">{errors.locationId}</p>}
     </>
   );
-  // top picks: roomy rows with a one-line description; the full catalogue: compact cards grouped by kind
-  const pickOption = (i: Image) => ({
-    value: i.id, title: i.name, icon: <OsBadge os={i.os} size={24} />,
-    badge: i.kind === 'custom' ? <Badge tone="violet">Custom</Badge> : undefined,
-    description: <span className="line-clamp-1">{i.description}</span>,
-  });
-  const imageGroup = (label: string, list: Image[], cols: 2 | 4) => list.length > 0 && (
+  // collapsed: three compact tiles side by side; expanded: the whole catalogue in the same tiles, grouped by kind
+  const imageGroup = (label: string, list: Image[]) => list.length > 0 && (
     <div className="space-y-2">
       <h3 className="text-xs font-medium uppercase tracking-wide text-muted">{label}</h3>
-      <OptionCards cols={cols} value={imageId} onChange={pickImage}
-        options={list.map((i) => ({ value: i.id, title: i.name, icon: <OsBadge os={i.os} size={24} />, description: pro || i.kind === 'custom' ? <span className="line-clamp-2">{i.description}</span> : undefined }))} />
+      <ImageTiles images={list} value={imageId} onChange={pickImage} />
     </div>
   );
   const imageCards = (
     <>
       {showAllImages ? (
         <div className="space-y-4">
-          {imageGroup(`Custom images · ${customImages.length}`, customImages, 2)}
-          {imageGroup(`Public images · ${publicImages.length}`, publicImages, 4)}
+          {imageGroup(`Custom images · ${customImages.length}`, customImages)}
+          {imageGroup(`Public images · ${publicImages.length}`, publicImages)}
         </div>
       ) : (
-        <OptionCards cols={1} value={imageId} onChange={pickImage} options={topPicks.map(pickOption)} />
-      )}
-      {/* no "show fewer" while the chosen image lives outside the top picks — it would vanish from view */}
-      {moreCount > 0 && (allImages || !showAllImages) && (
-        <button type="button" onClick={() => setAllImages(!allImages)}
-          className="flex items-center gap-1 text-[13px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
-          {showAllImages ? <>Show fewer <ChevronUp className="size-4" /></> : <>Show all images ({moreCount} more) <ChevronDown className="size-4" /></>}
-        </button>
+        <ImageTiles images={topPicks} value={imageId} onChange={pickImage} fixed3 />
       )}
       {errors.imageId && <p className="text-xs text-rose-500">{errors.imageId}</p>}
     </>
+  );
+  // no "show fewer" while the chosen image lives outside the top picks — it would vanish from view
+  const imageToggle = moreCount > 0 && (allImages || !showAllImages) && (
+    <button type="button" onClick={() => setAllImages(!allImages)}
+      className="flex items-center gap-1 text-[13px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+      {showAllImages ? <>Show fewer <ChevronUp className="size-4" /></> : <>Show all ({moreCount} more) <ChevronDown className="size-4" /></>}
+    </button>
   );
   const presetCards = (
     <OptionCards cols={4} value={presetId} onChange={setPresetId} options={familyPresets.map((p) => {
@@ -385,7 +380,7 @@ export default function VmCreate() {
               {locationCards}
               <div id="placement-override" className="border-t border-line pt-4"><h3 className="mb-3 text-[13px] font-semibold text-fg">Host placement</h3>{placementField}</div>
             </FormSection>
-            <FormSection step={3} title="Image" description="Operating system for the system disk.">{imageCards}</FormSection>
+            <FormSection step={3} title="Image" description="Operating system for the system disk." aside={imageToggle}>{imageCards}</FormSection>
             <FormSection step={4} title="Size" description="Start from a preset or dial in exactly what you need." aside={quotaLeft != null && <span className="text-xs text-muted">Project quota: {quotaLeft} vCPU</span>}>
               <Segmented value={family} onChange={pickFamily} options={[
                 { value: 'general', label: 'General' }, { value: 'compute', label: 'Compute' }, { value: 'memory', label: 'Memory' }, { value: 'gpu', label: 'GPU', icon: <Sparkles className="size-3.5" /> }, { value: 'custom', label: 'Custom' },
@@ -406,7 +401,7 @@ export default function VmCreate() {
                 <Hint tone="warning">This location has no private network for your project yet. <Link to="/infrastructure/networks/new" className="font-medium underline">Create a network</Link> or pick another location.</Hint>
               )}
             </FormSection>
-            <FormSection step={2} title="Image">{imageCards}</FormSection>
+            <FormSection step={2} title="Image" aside={imageToggle}>{imageCards}</FormSection>
             <FormSection step={3} title="Size">
               {isStandardFamily ? (
                 <>
@@ -492,6 +487,33 @@ function PlacementOverride({ locationId, projectId, vcpus, ramGB, gpu, mode, hos
           ),
         }))} />
       )}
+    </div>
+  );
+}
+
+/** Compact, radio-style image tiles: badge + name, several per row even in the narrow form column. */
+function ImageTiles({ images, value, onChange, fixed3 }: { images: Image[]; value: string; onChange: (id: string) => void; fixed3?: boolean }) {
+  return (
+    <div className="@container">
+      <div role="radiogroup" className={cn('grid gap-2', fixed3 ? 'grid-cols-1 @min-[20rem]:grid-cols-3' : 'grid-cols-2 @min-[24rem]:grid-cols-3 @min-[44rem]:grid-cols-4')}>
+        {images.map((i) => {
+          const active = value === i.id;
+          return (
+            <button key={i.id} type="button" role="radio" aria-checked={active} onClick={() => onChange(i.id)} title={`${i.name} — ${i.description}`}
+              className={cn('flex min-w-0 flex-col gap-1.5 rounded-xl border p-2.5 text-left transition-all',
+                active ? 'border-brand-500 bg-brand-500/[0.06] ring-3 ring-brand-500/15' : 'border-line bg-surface hover:border-line-strong hover:bg-surface-2/50')}>
+              <span className="flex w-full items-center gap-1.5">
+                <OsBadge os={i.os} size={20} />
+                {i.kind === 'custom' && <Badge tone="violet">Custom</Badge>}
+                <span className={cn('ml-auto flex size-4 shrink-0 items-center justify-center rounded-full border', active ? 'border-brand-500 bg-brand-500' : 'border-line-strong')}>
+                  {active && <span className="size-1.5 rounded-full bg-white" />}
+                </span>
+              </span>
+              <span className="line-clamp-2 text-[13px] font-medium leading-snug text-fg [overflow-wrap:anywhere]">{i.name}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
