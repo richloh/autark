@@ -112,7 +112,7 @@ function PublicCatalog({ images, all, loading }: { images: Image[]; all: Image[]
                 </dl>
                 {repl && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">Use <span className="font-medium">{repl.name}</span> instead.</p>}
                 <div className="mt-auto pt-3">
-                  <Button size="sm" variant={img.status === 'deprecated' ? 'ghost' : 'secondary'} className="w-full" icon={Rocket} to="/infrastructure/vms/new" disabled={img.status === 'deprecated'}>
+                  <Button size="sm" variant={img.status === 'deprecated' ? 'ghost' : 'secondary'} className="w-full" icon={Rocket} to={`/infrastructure/vms/new?image=${img.id}`} disabled={img.status === 'deprecated'}>
                     {img.status === 'deprecated' ? 'Not available for new VMs' : 'Launch VM'}
                   </Button>
                 </div>
@@ -195,7 +195,7 @@ function CustomImages({ images, all, loading, onCreate }: { images: Image[]; all
         defaultSort={{ id: 'age', dir: 'desc' }}
         rowActions={(i) => (
           <Menu trigger={() => <IconButton icon={MoreHorizontal} label="Image actions" size="sm" />} items={[
-            { label: 'Launch VM from image', icon: Rocket, to: '/infrastructure/vms/new', disabled: i.status !== 'available' },
+            { label: 'Launch VM from image', icon: Rocket, to: `/infrastructure/vms/new?image=${i.id}`, disabled: i.status !== 'available' },
             { label: 'Edit', icon: Pencil, disabled: i.status === 'creating', onClick: () => setEditing(i) },
             i.status === 'deprecated'
               ? { label: 'Mark available again', icon: ArchiveRestore, onClick: () => undeprecate.mutate(i) }

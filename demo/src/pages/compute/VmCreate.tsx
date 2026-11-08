@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { Server, Rocket, Cpu, MemoryStick, HardDrive, Sparkles, Plus, Shield, KeyRound, FileCode2 } from 'lucide-react';
+import { Server, Rocket, Cpu, MemoryStick, HardDrive, Sparkles, Plus, Shield, KeyRound, FileCode2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useList, useApiMutation } from '@/api/hooks';
 import { api, ApiClientError } from '@/api/client';
 import { Page, PageHeader } from '@/components/ui/PageHeader';
@@ -13,6 +13,7 @@ import { CostPanel } from '@/components/resource/CostPanel';
 import { PlacementPreview, usePlacement } from '@/components/compute/PlacementPreview';
 import { ProjectField, LocationCards, NetworkSubnetFields, useFirewallOptions } from '@/components/resource/pickers';
 import { OsBadge } from '@/lib/images';
+import { Badge } from '@/components/ui/Badge';
 import { vmCost } from '@/lib/pricing';
 import { money } from '@/lib/format';
 import { toast } from '@/components/ui/toast';
@@ -50,8 +51,8 @@ export default function VmCreate() {
   const [count, setCount] = useState(1);
   const [projectId, setProjectId] = useState('');
   const [locationId, setLocationId] = useState(sp.get('location') ?? 'dc1');
-  const [imageId, setImageId] = useState('img-ubuntu-2404');
-  const [imageTab, setImageTab] = useState<'public' | 'custom'>('public');
+  const [imageId, setImageId] = useState(sp.get('image') ?? 'img-ubuntu-2604');
+  const [allImages, setAllImages] = useState(false);
   const [family, setFamily] = useState<'general' | 'compute' | 'memory' | 'gpu' | 'custom'>('general');
   const [presetId, setPresetId] = useState('vm-m4');
   const [custom, setCustom] = useState({ vcpus: 4, ramGB: 8 });
@@ -149,8 +150,14 @@ export default function VmCreate() {
   const placementBlocked = placementData?.kind === 'selfHosted' && (!placementData.chosen || !placementData.chosen.fits);
   const canSubmit = !!name && !nameErr && !!projectId && !!net.subnetId && (image?.os === 'windows' || sshKeyIds.length > 0) && !placementBlocked;
 
-  const publicImages = images.filter((i) => i.kind === 'public' && i.status !== 'deprecated');
-  const customImages = images.filter((i) => i.kind === 'custom');
+  const OS_ORDER = ['ubuntu', 'debian', 'rocky', 'alma', 'fedora', 'suse', 'flatcar', 'windows'];
+  const publicImages = images.filter((i) => i.kind === 'public' && i.status !== 'deprecated')
+    .sort((a, b) => OS_ORDER.indexOf(a.os) - OS_ORDER.indexOf(b.os) || b.version.localeCompare(a.version, undefined, { numeric: true }));
+  const customImages = images.filter((i) => i.kind === 'custom' && i.status === 'available').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // top picks: latest Ubuntu LTS, the account's newest custom (golden) image, Windows — everything else behind "Show all"
+  const topPicks = [publicImages.find((i) => i.id === 'img-ubuntu-2604'), customImages[0], publicImages.find((i) => i.id === 'img-windows-2022')].filter((i): i is Image => !!i);
+  const moreCount = publicImages.length + customImages.length - topPicks.length;
+  const showAllImages = allImages || (!!image && !topPicks.some((i) => i.id === image.id));
   const quotaLeft = allowance ? allowance.quotas.vcpus : null;
 
   const requiredTags = allowance?.requiredTags ?? [];
@@ -183,14 +190,39 @@ export default function VmCreate() {
       {errors.locationId && <p className="text-xs text-rose-500">{errors.locationId}</p>}
     </>
   );
+  // top picks: roomy rows with a one-line description; the full catalogue: compact cards grouped by kind
+  const pickOption = (i: Image) => ({
+    value: i.id, title: i.name, icon: <OsBadge os={i.os} size={24} />,
+    badge: i.kind === 'custom' ? <Badge tone="violet">Custom</Badge> : undefined,
+    description: <span className="line-clamp-1">{i.description}</span>,
+  });
+  const imageGroup = (label: string, list: Image[], cols: 2 | 4) => list.length > 0 && (
+    <div className="space-y-2">
+      <h3 className="text-xs font-medium uppercase tracking-wide text-muted">{label}</h3>
+      <OptionCards cols={cols} value={imageId} onChange={pickImage}
+        options={list.map((i) => ({ value: i.id, title: i.name, icon: <OsBadge os={i.os} size={24} />, description: pro || i.kind === 'custom' ? <span className="line-clamp-2">{i.description}</span> : undefined }))} />
+    </div>
+  );
   const imageCards = (
     <>
-      <OptionCards cols={4} value={imageId} onChange={pickImage}
-        options={(imageTab === 'public' ? publicImages : customImages).map((i) => ({ value: i.id, title: i.name, description: pro ? i.description : undefined, icon: <OsBadge os={i.os} size={24} /> }))} />
+      {showAllImages ? (
+        <div className="space-y-4">
+          {imageGroup(`Custom images · ${customImages.length}`, customImages, 2)}
+          {imageGroup(`Public images · ${publicImages.length}`, publicImages, 4)}
+        </div>
+      ) : (
+        <OptionCards cols={1} value={imageId} onChange={pickImage} options={topPicks.map(pickOption)} />
+      )}
+      {/* no "show fewer" while the chosen image lives outside the top picks — it would vanish from view */}
+      {moreCount > 0 && (allImages || !showAllImages) && (
+        <button type="button" onClick={() => setAllImages(!allImages)}
+          className="flex items-center gap-1 text-[13px] font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400">
+          {showAllImages ? <>Show fewer <ChevronUp className="size-4" /></> : <>Show all images ({moreCount} more) <ChevronDown className="size-4" /></>}
+        </button>
+      )}
       {errors.imageId && <p className="text-xs text-rose-500">{errors.imageId}</p>}
     </>
   );
-  const imageTabs = (pro || customImages.length > 0) && <Segmented size="sm" value={imageTab} onChange={setImageTab} options={[{ value: 'public', label: 'Public' }, { value: 'custom', label: `Custom (${customImages.length})` }]} />;
   const presetCards = (
     <OptionCards cols={4} value={presetId} onChange={setPresetId} options={familyPresets.map((p) => {
       const c = vmCost({ vcpus: p.vcpus, ramGB: p.ramGB, systemDiskGB: p.systemDiskGB, gpu: p.gpu, cloud: loc?.kind === 'cloud' }).total;
@@ -353,7 +385,7 @@ export default function VmCreate() {
               {locationCards}
               <div id="placement-override" className="border-t border-line pt-4"><h3 className="mb-3 text-[13px] font-semibold text-fg">Host placement</h3>{placementField}</div>
             </FormSection>
-            <FormSection step={3} title="Image" description="Operating system for the system disk." aside={imageTabs}>{imageCards}</FormSection>
+            <FormSection step={3} title="Image" description="Operating system for the system disk.">{imageCards}</FormSection>
             <FormSection step={4} title="Size" description="Start from a preset or dial in exactly what you need." aside={quotaLeft != null && <span className="text-xs text-muted">Project quota: {quotaLeft} vCPU</span>}>
               <Segmented value={family} onChange={pickFamily} options={[
                 { value: 'general', label: 'General' }, { value: 'compute', label: 'Compute' }, { value: 'memory', label: 'Memory' }, { value: 'gpu', label: 'GPU', icon: <Sparkles className="size-3.5" /> }, { value: 'custom', label: 'Custom' },
@@ -374,7 +406,7 @@ export default function VmCreate() {
                 <Hint tone="warning">This location has no private network for your project yet. <Link to="/infrastructure/networks/new" className="font-medium underline">Create a network</Link> or pick another location.</Hint>
               )}
             </FormSection>
-            <FormSection step={2} title="Image" aside={imageTabs}>{imageCards}</FormSection>
+            <FormSection step={2} title="Image">{imageCards}</FormSection>
             <FormSection step={3} title="Size">
               {isStandardFamily ? (
                 <>

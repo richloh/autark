@@ -20,6 +20,7 @@ const CUSTOM_VM_PRESETS: VmPreset[] = [
 ];
 
 export const IMAGES: Image[] = [
+  { id: 'img-ubuntu-2604', name: 'Ubuntu 26.04 LTS', os: 'ubuntu', version: '26.04', kind: 'public', arch: 'x86_64', sizeGB: 2.5, minDiskGB: 10, status: 'available', description: 'Resolute Raccoon, cloud-init ready', createdAt: ago(190 * DAY), tags: [] },
   { id: 'img-ubuntu-2404', name: 'Ubuntu 24.04 LTS', os: 'ubuntu', version: '24.04', kind: 'public', arch: 'x86_64', sizeGB: 2.4, minDiskGB: 10, status: 'available', description: 'Noble Numbat, cloud-init ready', createdAt: ago(200 * DAY), tags: [] },
   { id: 'img-ubuntu-2204', name: 'Ubuntu 22.04 LTS', os: 'ubuntu', version: '22.04', kind: 'public', arch: 'x86_64', sizeGB: 2.2, minDiskGB: 10, status: 'available', description: 'Jammy Jellyfish', createdAt: ago(600 * DAY), tags: [] },
   { id: 'img-debian-13', name: 'Debian 13', os: 'debian', version: '13', kind: 'public', arch: 'x86_64', sizeGB: 1.6, minDiskGB: 8, status: 'available', description: 'Trixie', createdAt: ago(90 * DAY), tags: [] },
@@ -30,8 +31,9 @@ export const IMAGES: Image[] = [
   { id: 'img-suse-15', name: 'openSUSE Leap 15.6', os: 'suse', version: '15.6', kind: 'public', arch: 'x86_64', sizeGB: 2.0, minDiskGB: 10, status: 'available', description: 'SUSE community', createdAt: ago(300 * DAY), tags: [] },
   { id: 'img-flatcar', name: 'Flatcar Container Linux', os: 'flatcar', version: 'stable', kind: 'public', arch: 'x86_64', sizeGB: 0.9, minDiskGB: 8, status: 'available', description: 'Immutable, container-optimized', createdAt: ago(60 * DAY), tags: [] },
   { id: 'img-windows-2022', name: 'Windows Server 2022', os: 'windows', version: '2022', kind: 'public', arch: 'x86_64', sizeGB: 18, minDiskGB: 60, status: 'available', description: 'Bring your own license', createdAt: ago(400 * DAY), tags: [] },
-  { id: 'img-ubuntu-2004', name: 'Ubuntu 20.04 LTS', os: 'ubuntu', version: '20.04', kind: 'public', arch: 'x86_64', sizeGB: 2.0, minDiskGB: 10, status: 'deprecated', description: 'End of standard support', createdAt: ago(1500 * DAY), deprecatedAt: ago(220 * DAY), replacementId: 'img-ubuntu-2404', eol: '2025-05', tags: [] },
+  { id: 'img-ubuntu-2004', name: 'Ubuntu 20.04 LTS', os: 'ubuntu', version: '20.04', kind: 'public', arch: 'x86_64', sizeGB: 2.0, minDiskGB: 10, status: 'deprecated', description: 'End of standard support', createdAt: ago(1500 * DAY), deprecatedAt: ago(220 * DAY), replacementId: 'img-ubuntu-2604', eol: '2025-05', tags: [] },
   { id: 'img-compass-golden', name: 'compass-app-golden-2026-10', os: 'custom', version: '2026.10', kind: 'custom', arch: 'x86_64', sizeGB: 5.8, minDiskGB: 40, status: 'available', description: 'Ubuntu 24.04 + Java 21 + Compass app server 2026.10, CIS hardened (from compass-app-1)', createdAt: ago(20 * DAY), sourceSnapshotId: 'snap-003', sourceVmId: 'vm-001', accountId: R, projectId: 'proj-compass', tags: tags({ app: 'compass' }) },
+  { id: 'img-enneo-node', name: 'enneo-node-2026-11', os: 'custom', version: '2026.11', kind: 'custom', arch: 'x86_64', sizeGB: 4.2, minDiskGB: 40, status: 'available', description: 'Ubuntu 26.04 + containerd, Cilium prerequisites & Enneo node agent, CIS hardened', createdAt: ago(6 * DAY), accountId: E, projectId: 'proj-enneo-regiocom', tags: tags({ company: 'enneo' }) },
   { id: 'img-sles-sap', name: 'sles15-sp6-sap', os: 'suse', version: '15 SP6', kind: 'custom', arch: 'x86_64', sizeGB: 3.4, minDiskGB: 60, status: 'available', description: 'SUSE Linux Enterprise Server 15 SP6 for SAP Applications (BYOS, saptune applied)', createdAt: ago(150 * DAY), accountId: R, projectId: 'proj-isu', tags: tags({ team: 'sap-basis' }) },
 ];
 
