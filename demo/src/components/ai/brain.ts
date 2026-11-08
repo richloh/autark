@@ -61,10 +61,10 @@ export function suggestionsFor(ctx: PageContext): string[] {
   }
   if (ctx.listKind) {
     const p = KINDS[ctx.listKind].plural.toLowerCase();
-    return [`Which ${p} need attention?`, `Summarize my ${p}`, 'Where is my money going?', 'Spin up a VM like compass-app-1'];
+    return [`Which ${p} need attention?`, `Summarize my ${p}`, 'Where is my money going?', 'Spin up another VM like an existing one'];
   }
   if (ctx.path.startsWith('/billing')) return ['Where is my money going?', 'How do we compare to a hyperscaler?', 'Which projects are close to budget?'];
-  return ['Any issues I should look at?', 'Where is my money going?', 'Summarize my infrastructure', 'Spin up a VM like compass-app-1'];
+  return ['Any issues I should look at?', 'Where is my money going?', 'Summarize my infrastructure', 'Spin up another VM like an existing one'];
 }
 
 const t0 = () => performance.now();
@@ -156,10 +156,11 @@ async function summary(ctx: PageContext, parts: Part[]): Promise<Part[]> {
 }
 
 async function createLike(q: string, parts: Part[]): Promise<Part[]> {
-  const want = q.match(/like ([a-z0-9][\w-]*)/i)?.[1]?.toLowerCase() ?? 'compass-app-1';
-  const vms = await tool<{ items: any[] }>('list_vms', `/vms?name=${encodeURIComponent(want)}`, (r) => `${r.items.length} match`, parts);
-  const ref = vms.items[0];
+  const named = q.match(/like ([a-z0-9][\w-]*)/i)?.[1]?.toLowerCase();
+  const want = named && !['an', 'a', 'the', 'existing'].includes(named) ? named : null;
   const all = await tool<{ items: any[] }>('list_vms', '/vms', (r) => `${r.items.length} VMs`, parts);
+  // a named VM if given, otherwise the first running VM in the current scope
+  const ref = (want && all.items.find((v) => v.name === want)) || all.items.find((v) => v.status === 'running') || all.items[0];
   const base = (ref?.name ?? 'app').replace(/-\d+$/, '');
   let n = 1;
   while (all.items.some((v) => v.name === `${base}-${n}`) || (ref && `${base}-${n}` === ref.name)) n++;

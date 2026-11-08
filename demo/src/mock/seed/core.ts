@@ -3,6 +3,9 @@ import { ago, ahead, tags, R, E, KX, ME, projectAccount, DAY, HOUR, MIN } from '
 
 const REGIOCOM_PROJECTS = ['proj-compass', 'proj-orchestrator', 'proj-isu', 'proj-s4', 'proj-website', 'proj-tools'];
 const ENNEO_PROJECTS = ['proj-enneo-regiocom', 'proj-enneo-intern'];
+/** Monthly budgets for the Enneo projects (≈ 75–80 % used by the seeded resources). */
+const BUDGET_EP = 1500;
+const BUDGET_EI = 700;
 
 export function seedCore() {
   const accounts: Account[] = [
@@ -17,8 +20,8 @@ export function seedCore() {
     { id: 'proj-s4', accountId: R, name: 'SAP S4', description: 'S/4HANA Utilities transformation — sandbox & migration test system', color: '#14b8a6', createdAt: ago(160 * DAY) },
     { id: 'proj-website', accountId: R, name: 'Website', description: 'regiocom-energie.de — Typo3 corporate website & tariff calculator', color: '#f59e0b', createdAt: ago(610 * DAY) },
     { id: 'proj-tools', accountId: R, name: 'Interne Tools', description: 'GitLab, CI runners, monitoring, VPN, backups', color: '#64748b', createdAt: ago(715 * DAY) },
-    { id: 'proj-enneo-regiocom', accountId: E, name: 'Regiocom prod', description: 'Enneo AI customer service for Regiocom — hosted sovereignly in RZ Magdeburg', color: '#ec4899', createdAt: ago(240 * DAY) },
-    { id: 'proj-enneo-intern', accountId: E, name: 'Enneo-intern', description: 'Staging, development, CI and GPU experiments', color: '#a855f7', createdAt: ago(250 * DAY) },
+    { id: 'proj-enneo-regiocom', accountId: E, name: 'Regiocom prod', description: 'Enneo AI customer service for Regiocom — clusters p6 (production) & p9 (staging) plus SIP proxies, hosted sovereignly in RZ Magdeburg', color: '#ec4899', createdAt: ago(240 * DAY) },
+    { id: 'proj-enneo-intern', accountId: E, name: 'Enneo-intern', description: 'Enneo internal tooling: admin, monitoring, CI runner and offsite backups (RZ Magdeburg & RZ Frankfurt)', color: '#a855f7', createdAt: ago(250 * DAY) },
   ];
   const locations: Location[] = [
     { id: 'dc1', name: 'RZ Magdeburg', kind: 'selfHosted', city: 'Magdeburg', country: 'DE', lat: 52.13, lon: 11.63 },
@@ -61,7 +64,7 @@ export function seedCore() {
     { id: 'user-009', name: 'Richard Lohwasser', email: 'richard@enneo.ai', title: 'Enneo · Platform Engineering', roleIds: ['role-ops', 'role-ai-platform'], projectIds: ENNEO_PROJECTS, mfa: true, mfaMethod: 'webauthn', status: 'active', lastLogin: ago(1 * HOUR), createdAt: ago(250 * DAY), sso: false, tags: tags({ company: 'enneo' }),
       sessions: [sess('sess-010', 'browser', 'Chrome 131 · macOS', '198.51.100.140', 'Munich, DE', 3 * HOUR, 1 * HOUR), sess('sess-011', 'cli', 'autark CLI 1.8 · macOS', '198.51.100.140', 'Munich, DE', 5 * DAY, 3 * HOUR)],
       apiTokens: [{ id: 'tok-u005', name: 'k8s-admin', prefix: 'atk_live_e7e0', createdAt: ago(60 * DAY), expiresAt: ahead(30 * DAY), lastUsed: ago(3 * HOUR), status: 'active', lastUsedIp: '198.51.100.140' }] },
-    { id: 'user-010', name: 'Lena Vogt', email: 'lena@enneo.ai', title: 'Enneo · ML Engineer', roleIds: ['role-ai-platform'], projectIds: ['proj-enneo-intern'], mfa: true, mfaMethod: 'totp', status: 'active', lastLogin: ago(6 * HOUR), createdAt: ago(140 * DAY), sso: false, tags: tags({ company: 'enneo' }), sessions: [], apiTokens: [] },
+    { id: 'user-010', name: 'Lena Vogt', email: 'lena@enneo.ai', title: 'Enneo · ML Engineer', roleIds: ['role-ai-platform'], projectIds: ['proj-enneo-regiocom'], mfa: true, mfaMethod: 'totp', status: 'active', lastLogin: ago(6 * HOUR), createdAt: ago(140 * DAY), sso: false, tags: tags({ company: 'enneo' }), sessions: [], apiTokens: [] },
     { id: 'user-011', name: 'Lukas Neumann', email: 'lukas.neumann@regiocom-energie.de', title: 'Working student DevOps', roleIds: ['role-developer'], projectIds: ['proj-tools'], mfa: false, mfaMethod: null, mfaRequired: true, status: 'invited', lastLogin: null, createdAt: ago(1 * DAY), sso: true, tags: tags({ team: 'it-infrastruktur' }),
       invitedAt: ago(1 * DAY), invitedBy: ME, inviteExpiresAt: ahead(6 * DAY), sessions: [], apiTokens: [] },
     { id: 'user-012', name: 'Frank Meier', email: 'frank.meier@extern.regiocom-energie.de', title: 'External SAP consultant (contract ended)', roleIds: ['role-sap-basis'], projectIds: ['proj-isu'], mfa: true, mfaMethod: 'totp', status: 'disabled', lastLogin: ago(46 * DAY), createdAt: ago(400 * DAY), sso: false, tags: tags({ company: 'extern' }), disabledAt: ago(40 * DAY), sessions: [], apiTokens: [] },
@@ -84,7 +87,7 @@ export function seedCore() {
       permissions: { compute: ['read', 'create', 'update', 'operate'], storage: ['read', 'create', 'update', 'operate'], objectStorage: ['read', 'create', 'update'], network: ['read'], dns: ['read'], hardware: ['read'], billing: ['read'] } },
     { id: 'role-compass-dev', name: 'Compass Developer', description: 'Deploy and operate Compass ERP: app servers, Kubernetes workloads, database parameters and buckets.', system: false, createdAt: ago(420 * DAY), tags: tags({ team: 'compass' }),
       permissions: { compute: ['read', 'update', 'operate'], storage: ['read'], network: ['read'], dns: ['read'], db: ['read', 'update', 'operate'], k8s: ['read', 'create', 'update', 'operate'], objectStorage: ['read', 'create', 'update'], loadBalancers: ['read', 'update'] } },
-    { id: 'role-ai-platform', name: 'AI Platform Engineer', description: 'GPU compute, Kubernetes and object storage for LLM inference and fine-tuning.', system: false, createdAt: ago(230 * DAY), tags: tags({ company: 'enneo' }),
+    { id: 'role-ai-platform', name: 'AI Platform Engineer', description: 'Kubernetes workloads (LLM gateway, embeddings), VMs and object storage for the Enneo AI platform.', system: false, createdAt: ago(230 * DAY), tags: tags({ company: 'enneo' }),
       permissions: { compute: ['read', 'create', 'update', 'delete', 'operate'], storage: ['read', 'create', 'update', 'delete'], k8s: ['read', 'create', 'update', 'operate'], objectStorage: [...all], network: ['read'], hardware: ['read'] } },
   ];
 
@@ -100,9 +103,9 @@ export function seedCore() {
     { id: 'svc-003', name: 'prometheus-exporter', description: 'Prometheus exporter reading usage, health and cost metrics', roleIds: ['role-viewer'], projectIds: '*',
       tokens: [{ id: 'tok-004', name: 'prometheus', prefix: 'atk_live_c0de', createdAt: ago(90 * DAY), expiresAt: null, lastUsed: ago(1 * MIN), status: 'active', lastUsedIp: '10.50.1.20' }],
       ipAllowlist: ['10.50.1.20/32'], tagConditions: [], createdAt: ago(450 * DAY), lastUsed: ago(1 * MIN), tags: [] },
-    { id: 'svc-004', name: 'enneo-deployer', description: 'Argo CD / GitHub Actions deploying the Enneo platform', roleIds: ['role-developer'], projectIds: ENNEO_PROJECTS,
-      tokens: [{ id: 'tok-005', name: 'argocd', prefix: 'atk_live_e44e', createdAt: ago(35 * DAY), expiresAt: ahead(55 * DAY), lastUsed: ago(20 * MIN), status: 'active', lastUsedIp: '192.0.2.10' }],
-      ipAllowlist: ['192.0.2.0/26', '10.70.0.0/16'], tagConditions: [], createdAt: ago(230 * DAY), lastUsed: ago(20 * MIN), tags: tags({ company: 'enneo' }) },
+    { id: 'svc-004', name: 'enneo-deployer', description: 'Argo CD / GitHub Actions (enneo-ci-runner) deploying the Enneo platform to p6 and p9', roleIds: ['role-developer'], projectIds: ['proj-enneo-regiocom'],
+      tokens: [{ id: 'tok-005', name: 'argocd', prefix: 'atk_live_e44e', createdAt: ago(35 * DAY), expiresAt: ahead(55 * DAY), lastUsed: ago(20 * MIN), status: 'active', lastUsedIp: '10.71.1.11' }],
+      ipAllowlist: ['10.71.1.11/32', '10.60.16.0/20'], tagConditions: [], createdAt: ago(230 * DAY), lastUsed: ago(20 * MIN), tags: tags({ company: 'enneo' }) },
   ];
 
   const ALL_SVC: Service[] = ['compute', 'network', 'storage', 'db', 'k8s', 'objectStorage', 'dns', 'loadBalancers'];
@@ -120,9 +123,10 @@ export function seedCore() {
     al('proj-website', 'Website', 350, { vcpus: 16, ramGB: 48, vms: 5, volumesGB: 500, dbInstances: 1, k8sClusters: 0, buckets: 2, publicIps: 3 }, ['dc2', 'dc1', 'aws-eu-central-1'],
       { allowedServices: ['compute', 'network', 'storage', 'db', 'objectStorage', 'dns', 'loadBalancers'] }),
     al('proj-tools', 'Interne Tools', 1300, { vcpus: 64, ramGB: 192, vms: 12, volumesGB: 8000, dbInstances: 1, k8sClusters: 1, buckets: 4, publicIps: 4 }, ['dc1', 'dc2', 'hetzner-fsn1', 'hetzner-nbg1']),
-    al('proj-enneo-regiocom', 'Regiocom prod', 7000, { vcpus: 160, ramGB: 896, vms: 6, volumesGB: 4000, dbInstances: 3, k8sClusters: 1, buckets: 3, publicIps: 3 }, ['dc1']),
-    al('proj-enneo-intern', 'Enneo-intern', 3200, { vcpus: 96, ramGB: 384, vms: 12, volumesGB: 4000, dbInstances: 2, k8sClusters: 2, buckets: 4, publicIps: 4 }, ['dc1', 'hetzner-nbg1', 'hetzner-fsn1', 'hetzner-hel1'],
-      { hardLimit: true, alertThresholds: [50, 80, 100] }),
+    al('proj-enneo-regiocom', 'Regiocom prod', BUDGET_EP, { vcpus: 16, ramGB: 32, vms: 4, volumesGB: 500, dbInstances: 0, k8sClusters: 2, buckets: 0, publicIps: 8 }, ['dc1'],
+      { allowedServices: ['compute', 'network', 'k8s', 'dns'] }),
+    al('proj-enneo-intern', 'Enneo-intern', BUDGET_EI, { vcpus: 48, ramGB: 128, vms: 6, volumesGB: 6000, dbInstances: 0, k8sClusters: 0, buckets: 0, publicIps: 2 }, ['dc1', 'dc2'],
+      { allowedServices: ['compute', 'network', 'storage', 'dns'], hardLimit: true, alertThresholds: [50, 80, 100] }),
   ];
 
   const T = (type: AuditEvent['target']['type'], id: string, name: string) => ({ type, id, name });
@@ -132,12 +136,12 @@ export function seedCore() {
     ['provider.sync', T('provider', 'provider-ovh', 'OVHcloud'), 'system', '', 'failure', 'Authentication failed: application key expired'],
     ['k8s.scale', T('k8s', 'k8s-001', 'orchestrator-prod'), 'svc:terraform', 'proj-orchestrator', 'success', 'workers 4 → 6'],
     ['db.backup', T('db', 'db-001', 'compass-db'), 'system', 'proj-compass'],
-    ['vm.create', T('vm', 'vm-028', 'enneo-finetune-burst'), 'lena@enneo.ai', 'proj-enneo-intern', 'failure', 'Hetzner: no dedicated GPU capacity available in nbg1'],
+    ['vm.reboot', T('vm', 'vm-028', 'sip-proxy-1'), 'richard@enneo.ai', 'proj-enneo-regiocom', 'success', 'Kernel update — calls failed over to sip-proxy-2 (keepalived)'],
     ['firewall.update', T('firewall', 'fw-008', 'sap-isu'), 'thomas.becker@regiocom-energie.de', 'proj-isu', 'success', 'rules: RFC 3300-3399 from vpc-orchestrator'],
     ['lb.update', T('lb', 'lb-001', 'compass-lb'), 'jana.hoffmann@regiocom-energie.de', 'proj-compass', 'success', 'listeners: /api → compass-api'],
     ['bareMetal.maintenance', T('bareMetal', 'bm-004', 'mdg-hv-04'), 'katrin.schulze@regiocom-energie.de', '', 'success', 'DIMM B3 replacement (OPS-1182)'],
     ['user.invite', T('user', 'user-011', 'lukas.neumann@regiocom-energie.de'), ME, ''],
-    ['k8s.upgrade', T('k8s', 'k8s-003', 'enneo-staging'), 'richard@enneo.ai', 'proj-enneo-intern', 'success', '1.31 → 1.32'],
+    ['k8s.upgrade', T('k8s', 'k8s-003', 'p9'), 'richard@enneo.ai', 'proj-enneo-regiocom', 'success', '1.31 → 1.32'],
     ['dnsZone.update', T('dnsZone', 'zone-001', 'regiocom-energie.de'), 'stefan.wagner@regiocom-energie.de', 'proj-website', 'success', 'records: CAA iodef, DMARC p=reject'],
     ['bucket.update', T('bucket', 'bkt-001', 'compass-invoices'), 'svc:terraform', 'proj-compass', 'success', 'objectLock: compliance 3650 days (GoBD)'],
     ['vm.snapshot', T('vm', 'vm-017', 'gitlab'), 'katrin.schulze@regiocom-energie.de', 'proj-tools', 'success', 'Before GitLab 17.5 upgrade'],
@@ -145,8 +149,8 @@ export function seedCore() {
     ['volume.resize', T('volume', 'vol-007', 'isu-hana-data'), 'thomas.becker@regiocom-energie.de', 'proj-isu', 'success', '2500 → 3000 GB'],
     ['vm.create', T('vm', 'vm-013', 's4-webdispatcher'), 'thomas.becker@regiocom-energie.de', 'proj-s4'],
     ['systemAccount.rotate', T('systemAccount', 'svc-002', 'terraform'), ME, ''],
-    ['k8s.deploy', T('k8s', 'k8s-002', 'enneo-prod'), 'svc:enneo-deployer', 'proj-enneo-regiocom', 'success', 'enneo-api 4.18.0 → 4.19.1'],
-    ['db.update', T('db', 'db-004', 'enneo-prod-db'), 'richard@enneo.ai', 'proj-enneo-regiocom', 'success', 'parameters: shared_preload_libraries=vector'],
+    ['k8s.deploy', T('k8s', 'k8s-002', 'p6'), 'svc:enneo-deployer', 'proj-enneo-regiocom', 'success', 'enneo-api 4.18.0 → 4.19.1'],
+    ['dnsZone.create', T('dnsZone', 'zone-007', 'e-wie-einfach.enneo.ai'), 'richard@enneo.ai', 'proj-enneo-regiocom', 'success', 'A @ → p6 node IPs (203.0.113.40–42)'],
     ['ip.allocate', T('ip', 'ip-009', '203.0.113.11'), 'jana.hoffmann@regiocom-energie.de', 'proj-compass'],
     ['role.update', T('role', 'role-sap-basis', 'SAP Basis'), ME, ''],
     ['bareMetal.offline', T('bareMetal', 'bm-017', 'fra-hv-04'), 'system', '', 'failure', 'PSU 2 failure — VMs evacuated to fra-hv-01/02'],
@@ -174,8 +178,8 @@ export function seedCore() {
     { id: 'ntf-007', level: 'success', title: 'Billing run capacity ready', message: 'compass-billing-2 resized to 32 vCPU / 128 GB for the Turnusabrechnung run tonight.', time: ago(3 * HOUR), read: false, link: '/infrastructure/vms/vm-005', accountId: R },
     { id: 'ntf-008', level: 'warning', title: 'Host certificate expiring', message: 'The agent TLS certificate of fra-hv-04 (installed 2023) expires in 6 days. Renew it once the host is back online.', time: ago(9 * HOUR), read: false, link: '/hardware/bare-metals/bm-017', accountId: R },
     { id: 'ntf-009', level: 'warning', title: 'Disk degrading on mdg-stor-02', message: 'sd7 reports 48 reallocated sectors. Ceph OSD.31 is marked out; data is re-replicating.', time: ago(14 * HOUR), read: true, link: '/hardware/bare-metals/bm-011', accountId: R },
-    { id: 'ntf-010', level: 'error', title: 'enneo-finetune-burst failed', message: 'Hetzner: no dedicated GPU capacity available in nbg1. Try fsn1 or the on-prem GPU host mdg-gpu-02.', time: ago(6 * HOUR), read: false, link: '/infrastructure/vms/vm-028', accountId: E },
-    { id: 'ntf-011', level: 'success', title: 'enneo-staging upgraded', message: 'Kubernetes 1.31 → 1.32 completed. All workloads healthy.', time: ago(2 * DAY), read: true, link: '/managed-services/kubernetes/k8s-003', accountId: E },
+    { id: 'ntf-010', level: 'warning', title: 'Monitoring disk 81% full', message: 'enneo-prometheus-tsdb on enneo-monitoring is 81% full. Resize the volume or lower Prometheus retention (currently 30 days).', time: ago(6 * HOUR), read: false, link: '/infrastructure/vms/vm-025', accountId: E },
+    { id: 'ntf-011', level: 'success', title: 'p9 upgraded', message: 'Staging cluster p9: Kubernetes 1.31 → 1.32 completed. All workloads healthy — p6 can follow in its Saturday window.', time: ago(2 * DAY), read: true, link: '/managed-services/kubernetes/k8s-003', accountId: E },
   ];
 
   const mkOp = (id: string, type: string, title: string, target: Operation['target'], projectId: string, whenMs: number, steps: string[], actor = ME, status: Operation['status'] = 'succeeded', error?: string): Operation => {
@@ -195,9 +199,9 @@ export function seedCore() {
   const operations: Operation[] = [
     mkOp('op-h001', 'vm.resize', 'Resize compass-billing-2 for Turnusabrechnung', { type: 'vm', id: 'vm-005', name: 'compass-billing-2' }, 'proj-compass', 3 * HOUR, ['Validate request', 'Check host capacity on mdg-hv-02', 'Stop batch worker gracefully', 'Apply new size (32 vCPU / 128 GB)', 'Start & health check']),
     mkOp('op-h002', 'volume.snapshot', 'HANA backup isu-hana-db', { type: 'volume', id: 'vol-007', name: 'isu-hana-data' }, 'proj-isu', 7 * HOUR, ['BACKUP DATA savepoint', 'Snapshot isu-hana-data & isu-hana-log', 'Copy to isu-hana-backups (RZ Frankfurt)', 'Verify checksum & catalog'], 'system'),
-    mkOp('op-h003', 'vm.create', 'Provision VM enneo-finetune-burst', { type: 'vm', id: 'vm-028', name: 'enneo-finetune-burst' }, 'proj-enneo-intern', 6 * HOUR, ['Validate request', 'Request GPU capacity from Hetzner nbg1'], 'lena@enneo.ai', 'failed', 'Hetzner: no dedicated GPU capacity available in nbg1'),
+    mkOp('op-h003', 'vm.reboot', 'Reboot sip-proxy-1', { type: 'vm', id: 'vm-028', name: 'sip-proxy-1' }, 'proj-enneo-regiocom', 6 * HOUR, ['Validate request', 'Graceful shutdown (keepalived hands VIP to sip-proxy-2)', 'Start & health check'], 'richard@enneo.ai'),
     mkOp('op-h004', 'provider.sync', 'Sync OVHcloud inventory', { type: 'provider', id: 'provider-ovh', name: 'OVHcloud' }, '', 30 * MIN, ['Authenticate'], 'system', 'failed', 'Authentication failed: application key expired'),
-    mkOp('op-h005', 'k8s.upgrade', 'Upgrade enneo-staging to 1.32', { type: 'k8s', id: 'k8s-003', name: 'enneo-staging' }, 'proj-enneo-intern', 2 * DAY, ['Pre-flight checks', 'Upgrade control plane', 'Surge upgrade default', 'Surge upgrade gpu', 'Verify workloads'], 'richard@enneo.ai'),
+    mkOp('op-h005', 'k8s.upgrade', 'Upgrade p9 to 1.32', { type: 'k8s', id: 'k8s-003', name: 'p9' }, 'proj-enneo-regiocom', 2 * DAY, ['Pre-flight checks', 'Upgrade control plane', 'Surge upgrade workers', 'Verify workloads'], 'richard@enneo.ai'),
     mkOp('op-h006', 'db.backup', 'Backup compass-db', { type: 'db', id: 'db-001', name: 'compass-db' }, 'proj-compass', 9 * HOUR, ['Snapshot WAL', 'Upload to backup store'], 'system'),
     mkOp('op-h007', 'bareMetal.evacuate', 'Evacuate mdg-hv-04 for maintenance', { type: 'bareMetal', id: 'bm-004', name: 'mdg-hv-04' }, '', 2 * DAY + 4 * HOUR, ['Plan moves', 'Live-migrate 6 VMs', 'Cordon Kubernetes nodes', 'Enter maintenance mode'], 'katrin.schulze@regiocom-energie.de'),
     mkOp('op-h008', 'k8s.scale', 'Scale orchestrator-prod/workers to 6 nodes', { type: 'k8s', id: 'k8s-001', name: 'orchestrator-prod' }, 'proj-orchestrator', 4 * DAY, ['Reserve capacity', 'Provision 2 nodes', 'Join cluster', 'Rebalance pods'], 'svc:terraform'),

@@ -13,6 +13,9 @@ const sysRoutes = (cidr: string, nat: boolean): Route[] => [
 /** WireGuard client range — admins reach every VPC through vpn-gw. */
 const VPN = '10.99.0.0/16';
 const MONITORING = '10.50.1.20/32';
+/** Enneo-intern: monitoring & bastion (reach vpc-enneo-prod through peering). */
+const ENNEO_MON = '10.70.1.20/32';
+const ENNEO_ADMIN = '10.70.1.10/32';
 
 export function seedNetwork() {
   const enneoTags = (env: string) => tags({ env, team: 'enneo' });
@@ -57,17 +60,24 @@ export function seedNetwork() {
     { id: 'net-009', name: 'vpc-tools-ext', ...scope('proj-tools'), cidr: '10.52.0.0/16', locationId: 'hetzner-fsn1', status: 'available', natGateway: false, dnsZoneId: null, mtu: 1450,
       subnets: [sn('sn-016', 'ext-public', '10.52.1.0/24', true)],
       routes: sysRoutes('10.52.0.0/16', false), peerings: [], createdAt: ago(300 * DAY), tags: ptags('proj-tools', 'prod'), description: 'External status page & uptime checks (outside our own DCs)' },
-    { id: 'net-010', name: 'vpc-enneo-intern', ...scope('proj-enneo-intern'), cidr: '10.70.0.0/16', locationId: 'dc1', status: 'available', natGateway: true, dnsZoneId: null, mtu: 1450,
-      subnets: [sn('sn-017', 'intern-dev', '10.70.1.0/24', true), sn('sn-018', 'intern-data', '10.70.2.0/24', false), sn('sn-019', 'intern-k8s', '10.70.16.0/20', false)],
-      routes: [...sysRoutes('10.70.0.0/16', true), { id: 'rt-010', destination: '10.71.0.0/16', target: { type: 'vpn', id: 'net-011' }, description: 'Site-to-site to Hetzner burst VPC' }],
-      peerings: [{ id: 'peer-005', networkId: 'net-011', status: 'active', kind: 'vpn' }], createdAt: ago(245 * DAY), tags: enneoTags('dev') },
-    { id: 'net-011', name: 'vpc-enneo-burst', ...scope('proj-enneo-intern'), cidr: '10.71.0.0/16', locationId: 'hetzner-nbg1', status: 'available', natGateway: false, dnsZoneId: null, mtu: 1450,
-      subnets: [sn('sn-020', 'burst', '10.71.1.0/24', true)],
-      routes: [...sysRoutes('10.71.0.0/16', false), { id: 'rt-011', destination: '10.70.0.0/16', target: { type: 'vpn', id: 'net-010' }, description: 'Site-to-site to RZ Magdeburg' }],
-      peerings: [{ id: 'peer-005', networkId: 'net-010', status: 'active', kind: 'vpn' }], createdAt: ago(130 * DAY), tags: tags({ env: 'ci', team: 'enneo', burst: 'true' }) },
+    { id: 'net-010', name: 'vpc-intern-mdg', ...scope('proj-enneo-intern'), cidr: '10.70.0.0/16', locationId: 'dc1', status: 'available', natGateway: true, dnsZoneId: null, mtu: 1450,
+      subnets: [sn('sn-017', 'intern-mdg', '10.70.1.0/24', false, 'Admin & monitoring')],
+      routes: [...sysRoutes('10.70.0.0/16', true),
+        { id: 'rt-010', destination: '10.71.0.0/16', target: { type: 'peering', id: 'net-011' }, description: 'To RZ Frankfurt (vpc-intern-fra)' },
+        { id: 'rt-012', destination: '10.60.0.0/16', target: { type: 'peering', id: 'net-012' }, description: 'To Regiocom prod (p6, p9, SIP proxies)' }],
+      peerings: [{ id: 'peer-005', networkId: 'net-011', status: 'active', kind: 'peering' }, { id: 'peer-006', networkId: 'net-012', status: 'active', kind: 'peering' }],
+      createdAt: ago(245 * DAY), tags: enneoTags('internal'), description: 'Enneo internal tooling in RZ Magdeburg' },
+    { id: 'net-011', name: 'vpc-intern-fra', ...scope('proj-enneo-intern'), cidr: '10.71.0.0/16', locationId: 'dc2', status: 'available', natGateway: true, dnsZoneId: null, mtu: 1450,
+      subnets: [sn('sn-020', 'intern-fra', '10.71.1.0/24', false, 'CI runner & offsite backups')],
+      routes: [...sysRoutes('10.71.0.0/16', true), { id: 'rt-011', destination: '10.70.0.0/16', target: { type: 'peering', id: 'net-010' }, description: 'To RZ Magdeburg (vpc-intern-mdg)' },
+        { id: 'rt-014', destination: '10.60.0.0/16', target: { type: 'peering', id: 'net-012' }, description: 'From p6 (backup pushes)' }],
+      peerings: [{ id: 'peer-005', networkId: 'net-010', status: 'active', kind: 'peering' }, { id: 'peer-007', networkId: 'net-012', status: 'active', kind: 'peering' }], createdAt: ago(210 * DAY), tags: enneoTags('internal'), description: 'Enneo internal tooling in RZ Frankfurt' },
     { id: 'net-012', name: 'vpc-enneo-prod', ...scope('proj-enneo-regiocom'), cidr: '10.60.0.0/16', locationId: 'dc1', status: 'available', natGateway: true, dnsZoneId: null, mtu: 1450,
-      subnets: [sn('sn-021', 'enneo-edge', '10.60.1.0/24', true), sn('sn-022', 'enneo-data', '10.60.2.0/24', false), sn('sn-023', 'enneo-k8s', '10.60.16.0/20', false)],
-      routes: sysRoutes('10.60.0.0/16', true), peerings: [], createdAt: ago(238 * DAY), tags: enneoTags('prod'), description: 'Enneo platform for Regiocom — customer data stays in RZ Magdeburg' },
+      subnets: [sn('sn-021', 'enneo-sip', '10.60.1.0/24', false, 'Kamailio SIP proxies (private only)'), sn('sn-023', 'enneo-k8s', '10.60.16.0/20', true, 'Nodes of p6 & p9 (one public IP per node)')],
+      routes: [...sysRoutes('10.60.0.0/16', true), { id: 'rt-013', destination: '10.70.0.0/16', target: { type: 'peering', id: 'net-010' }, description: 'To Enneo-intern Magdeburg (admin & monitoring)' },
+        { id: 'rt-015', destination: '10.71.0.0/16', target: { type: 'peering', id: 'net-011' }, description: 'To Enneo-intern Frankfurt (offsite backups)' }],
+      peerings: [{ id: 'peer-006', networkId: 'net-010', status: 'active', kind: 'peering' }, { id: 'peer-007', networkId: 'net-011', status: 'active', kind: 'peering' }],
+      createdAt: ago(238 * DAY), tags: enneoTags('production'), description: 'Enneo for Regiocom — clusters p6 & p9 and the SIP proxies; customer data stays in RZ Magdeburg' },
   ];
 
   const ipPools: IpPool[] = [
@@ -81,7 +91,7 @@ export function seedNetwork() {
     { id: 'pool-aws-euc1', name: 'AWS eu-central-1 Elastic IPs', version: 4, cidr: '192.0.2.160/27', locationId: 'aws-eu-central-1', reserved: 4 },
   ];
 
-  const ipSpec: [string, string, string, string, IpAddress['assignedTo'], string?][] = [
+  const ipSpec: [string, string, string, string, IpAddress['assignedTo'], string?, string?][] = [
     ['ip-001', '203.0.113.10', 'pool-dc1', 'proj-compass', { type: 'lb', id: 'lb-001' }, 'compass.regiocom-energie.de'],
     ['ip-002', '2001:db8:4d47::10', 'pool-dc1-v6', 'proj-compass', { type: 'lb', id: 'lb-001' }, 'compass.regiocom-energie.de'],
     ['ip-009', '203.0.113.11', 'pool-dc1', 'proj-compass', null],
@@ -89,17 +99,20 @@ export function seedNetwork() {
     ['ip-004', '203.0.113.21', 'pool-dc1', 'proj-orchestrator', { type: 'lb', id: 'lb-003' }, 'as4.regiocom-energie.de'],
     ['ip-005', '203.0.113.30', 'pool-dc1', 'proj-tools', { type: 'vm', id: 'vm-017' }, 'gitlab.regiocom-energie.de'],
     ['ip-006', '203.0.113.31', 'pool-dc1', 'proj-tools', { type: 'vm', id: 'vm-019' }, 'vpn.regiocom-energie.de'],
-    ['ip-007', '203.0.113.40', 'pool-dc1', 'proj-enneo-regiocom', { type: 'lb', id: 'lb-004' }, 'regiocom.enneo.ai'],
-    ['ip-008', '203.0.113.41', 'pool-dc1', 'proj-enneo-regiocom', null],
+    // Enneo · one public IP per Kubernetes node (p6 = production, p9 = staging); no load balancer
+    ['ip-007', '203.0.113.40', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-002' }, 'p6-node-1.enneo.ai', 'p6-node-1'],
+    ['ip-008', '203.0.113.41', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-002' }, 'p6-node-2.enneo.ai', 'p6-node-2'],
+    ['ip-016', '203.0.113.42', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-002' }, 'p6-node-3.enneo.ai', 'p6-node-3'],
+    ['ip-017', '203.0.113.43', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-003' }, 'p9-node-1.enneo.ai', 'p9-node-1'],
+    ['ip-018', '203.0.113.44', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-003' }, 'p9-node-2.enneo.ai', 'p9-node-2'],
+    ['ip-019', '203.0.113.45', 'pool-dc1', 'proj-enneo-regiocom', { type: 'k8s', id: 'k8s-003' }, 'p9-node-3.enneo.ai', 'p9-node-3'],
     ['ip-010', '198.51.100.10', 'pool-dc2', 'proj-website', { type: 'lb', id: 'lb-002' }, 'www.regiocom-energie.de'],
     ['ip-011', '2001:db8:4652::10', 'pool-dc2-v6', 'proj-website', { type: 'lb', id: 'lb-002' }, 'www.regiocom-energie.de'],
-    ['ip-012', '192.0.2.10', 'pool-hetzner-nbg1', 'proj-enneo-intern', { type: 'vm', id: 'vm-026' }],
-    ['ip-013', '192.0.2.11', 'pool-hetzner-nbg1', 'proj-enneo-intern', { type: 'vm', id: 'vm-027' }],
     ['ip-014', '192.0.2.70', 'pool-hetzner-fsn1', 'proj-tools', { type: 'vm', id: 'vm-023' }, 'status.regiocom-energie.de'],
     ['ip-015', '192.0.2.170', 'pool-aws-euc1', 'proj-website', { type: 'vm', id: 'vm-016' }],
   ];
-  const ips: IpAddress[] = ipSpec.map(([id, address, poolId, project, assignedTo, rdns], i) => ({
-    id, address, version: address.includes(':') ? 6 : 4, poolId, ...scope(project), assignedTo, reverseDns: rdns ?? null,
+  const ips: IpAddress[] = ipSpec.map(([id, address, poolId, project, assignedTo, rdns, name], i) => ({
+    id, address, version: address.includes(':') ? 6 : 4, poolId, ...scope(project), assignedTo, reverseDns: rdns ?? null, ...(name ? { name } : {}),
     createdAt: ago((600 - i * 31) * DAY), tags: [],
   }));
 
@@ -164,27 +177,58 @@ export function seedNetwork() {
     fw('fw-016', 'status-page', 'proj-tools', 'prod', 'Public status page',
       [r('inbound', 'tcp', '80,443', '0.0.0.0/0', 'allow', 100, 'HTTP/HTTPS'), r('inbound', 'tcp', '22', '203.0.113.31/32', 'allow', 110, 'SSH from vpn-gw')],
       [vm('vm-023')], 300),
-    fw('fw-017', 'enneo-nodes', 'proj-enneo-regiocom', 'prod', 'Kubernetes nodes of enneo-prod',
-      [r('inbound', 'tcp', '30000-32767', '10.60.0.0/16', 'allow', 100, 'NodePorts from VPC'), r('inbound', 'tcp', '10250', '10.60.16.0/20', 'allow', 110, 'Kubelet')],
-      [{ type: 'k8s', id: 'k8s-002' }], 236),
-    fw('fw-018', 'enneo-ingress', 'proj-enneo-regiocom', 'prod', 'Public HTTPS for regiocom.enneo.ai',
-      [r('inbound', 'tcp', '80,443', '0.0.0.0/0', 'allow', 100, 'HTTP/HTTPS')],
-      [{ type: 'lb', id: 'lb-004' }], 236),
-    fw('fw-019', 'enneo-data', 'proj-enneo-regiocom', 'prod', 'PostgreSQL (pgvector) & Redis queue',
-      [r('inbound', 'tcp', '5432', '10.60.16.0/20', 'allow', 100, 'Postgres from cluster'), r('inbound', 'tcp', '6379', '10.60.16.0/20', 'allow', 110, 'Redis from cluster')],
-      [{ type: 'db', id: 'db-004' }, { type: 'db', id: 'db-005' }], 236),
-    fw('fw-020', 'enneo-dev', 'proj-enneo-intern', 'dev', 'Dev VMs & staging cluster',
-      [r('inbound', 'tcp', '22', VPN, 'allow', 100, 'SSH via VPN'), r('inbound', 'tcp', '8000', '10.70.0.0/16', 'allow', 110, 'vLLM OpenAI API inside VPC'), r('inbound', 'any', '*', '10.71.0.0/16', 'allow', 120, 'CI runners (burst VPC)'),
-        r('inbound', 'tcp', '5432', '10.70.16.0/20', 'allow', 130, 'Postgres from staging cluster')],
-      [vm('vm-024'), vm('vm-025'), { type: 'k8s', id: 'k8s-003' }, { type: 'db', id: 'db-007' }], 240),
-    fw('fw-021', 'enneo-burst', 'proj-enneo-intern', 'ci', 'Hetzner burst VMs',
-      [r('inbound', 'tcp', '22', '10.70.0.0/16', 'allow', 100, 'SSH from RZ Magdeburg (site-to-site)')],
-      [vm('vm-026'), vm('vm-027'), vm('vm-028')], 130),
+    fw('fw-017', 'enneo-nodes', 'proj-enneo-regiocom', 'production', 'Kubernetes nodes of p6 and p9 — public HTTPS straight to the node IPs (ingress-nginx)',
+      [r('inbound', 'tcp', '80,443', '0.0.0.0/0', 'allow', 100, 'HTTP/HTTPS to ingress-nginx on the node IPs'), r('inbound', 'udp', '443', '0.0.0.0/0', 'allow', 105, 'HTTP/3 QUIC'),
+        r('inbound', 'udp', '5060', '10.60.1.0/24', 'allow', 110, 'SIP from the SIP proxies to voice-gateway'), r('inbound', 'tcp', '30000-32767', '10.60.0.0/16', 'allow', 115, 'NodePorts from VPC'),
+        r('inbound', 'tcp', '10250', '10.60.16.0/20', 'allow', 120, 'Kubelet'), r('inbound', 'tcp', '9100,10250', ENNEO_MON, 'allow', 125, 'Scrape from enneo-monitoring')],
+      [{ type: 'k8s', id: 'k8s-002' }, { type: 'k8s', id: 'k8s-003' }], 236),
+    fw('fw-018', 'enneo-sip', 'proj-enneo-regiocom', 'production', 'Kamailio SIP proxies (private only, no public IP)',
+      [r('inbound', 'udp', '5060', '10.0.0.0/8', 'allow', 100, 'SIP (UDP) from Regiocom telephony'), r('inbound', 'tcp', '5060-5061', '10.0.0.0/8', 'allow', 105, 'SIP over TCP / TLS from Regiocom telephony'),
+        r('inbound', 'udp', '5060', '10.60.16.0/20', 'allow', 110, 'SIP from voice-gateway pods (p6 / p9)'), r('inbound', 'any', '*', '10.60.1.0/24', 'allow', 115, 'keepalived (VRRP) between the proxies'),
+        r('inbound', 'tcp', '22', ENNEO_ADMIN, 'allow', 120, 'SSH from enneo-internal-admin (bastion)'), r('inbound', 'tcp', '9100', ENNEO_MON, 'allow', 125, 'node_exporter scrape (enneo-monitoring)')],
+      [vm('vm-028'), vm('vm-029')], 120),
+    fw('fw-020', 'enneo-intern-mdg', 'proj-enneo-intern', 'internal', 'Admin & monitoring in RZ Magdeburg',
+      [r('inbound', 'tcp', '22', VPN, 'allow', 100, 'SSH via WireGuard VPN'), r('inbound', 'tcp', '443,3000', VPN, 'allow', 105, 'Admin UI & Grafana via VPN'),
+        r('inbound', 'tcp', '22,9100', '10.71.0.0/16', 'allow', 110, 'From RZ Frankfurt (CI runner deploys, backup pulls)')],
+      [vm('vm-024'), vm('vm-025')], 240),
+    fw('fw-021', 'enneo-intern-fra', 'proj-enneo-intern', 'internal', 'CI runner & offsite backup in RZ Frankfurt',
+      [r('inbound', 'tcp', '22', ENNEO_ADMIN, 'allow', 100, 'SSH from enneo-internal-admin (bastion)'), r('inbound', 'tcp', '9100', ENNEO_MON, 'allow', 110, 'node_exporter scrape (enneo-monitoring)'),
+        r('inbound', 'tcp', '8000', '10.60.16.0/20', 'allow', 120, 'restic REST server — dumps pushed from p6')],
+      [vm('vm-026'), vm('vm-027')], 210),
   ];
 
   let rec = 0;
   const d = (type: DnsRecord['type'], name: string, value: string, ttl = 300, priority?: number, managedBy?: Ref): DnsRecord => ({ id: `rec-${++rec}`, type, name, value, ttl, priority, managedBy: managedBy ?? null });
   const NS = ['ns1.autark.regiocom-energie.de', 'ns2.autark.regiocom-energie.de'];
+  /** Enneo customer-service portals for Regiocom's brands: production on p6, matching -dev zones on p9 (A records round-robin over the node IPs). */
+  const P6 = ['203.0.113.40', '203.0.113.41', '203.0.113.42'];
+  const P9 = ['203.0.113.43', '203.0.113.44', '203.0.113.45'];
+  const enneoZone = (id: string, name: string, brand: string, cluster: 'k8s-002' | 'k8s-003', days: number, verification: string): DnsZone => {
+    const prod = cluster === 'k8s-002';
+    const k8s: Ref = { type: 'k8s', id: cluster };
+    return {
+      id, name, ...scope('proj-enneo-regiocom'), kind: 'public', networkId: null, dnssec: prod, defaultTtl: prod ? 3600 : 300, serial: 2026110600 + Number(id.slice(-1)), nameservers: NS, status: 'active',
+      createdAt: ago(days * DAY), tags: enneoTags(prod ? 'production' : 'staging'),
+      description: `Enneo customer service for ${brand} — ${prod ? 'production (p6)' : 'staging (p9)'}`,
+      dsRecord: prod ? `${name}. 3600 IN DS ${40000 + days * 7} 13 2 ${verification.repeat(4).toUpperCase()}` : null,
+      records: [
+        ...(prod ? P6 : P9).map((ip) => d('A', '@', ip, 300, undefined, k8s)),
+        d('CNAME', 'www', `${name}.`, 300),
+        d('CNAME', 'app', `${name}.`, 300),
+        d('TXT', '@', 'v=spf1 include:_spf.enneo.ai -all', 3600),
+        d('TXT', '@', `enneo-site-verification=${verification}`, 3600),
+        d('CAA', '@', '0 issue "letsencrypt.org"', 3600),
+      ],
+    };
+  };
+  const enneoZones = () => [
+    enneoZone('zone-003', 'naturwerke.enneo.ai', 'Naturwerke', 'k8s-002', 230, '7f3c9a1e5b2d4086'),
+    enneoZone('zone-006', 'gruenwelt.enneo.ai', 'Grünwelt', 'k8s-002', 180, 'c41e0b9d7a3f2e65'),
+    enneoZone('zone-007', 'e-wie-einfach.enneo.ai', 'E WIE EINFACH', 'k8s-002', 95, '2a8d6f1c0e9b4a37'),
+    enneoZone('zone-008', 'naturwerke-dev.enneo.ai', 'Naturwerke', 'k8s-003', 232, '9e1b3c5d7f0a2468'),
+    enneoZone('zone-009', 'gruenwelt-dev.enneo.ai', 'Grünwelt', 'k8s-003', 184, 'd05f7b2e9c1a3e86'),
+    enneoZone('zone-010', 'e-wie-einfach-dev.enneo.ai', 'E WIE EINFACH', 'k8s-003', 101, '6b4a2c8e0d1f3957'),
+  ];
   const dnsZones: DnsZone[] = [
     { id: 'zone-001', name: 'regiocom-energie.de', ...scope('proj-website'), kind: 'public', networkId: null, dnssec: true, defaultTtl: 3600, serial: 2026110801, nameservers: NS, status: 'active', createdAt: ago(600 * DAY), tags: ptags('proj-website', 'prod'), description: 'Corporate domain',
       dsRecord: 'regiocom-energie.de. 3600 IN DS 31589 13 2 A7C1F0E3B5D2C4A6F8E9D0C1B2A3F4E5D6C7B8A9F0E1D2C3B4A5F6E7D8C9B0A1',
@@ -210,12 +254,6 @@ export function seedNetwork() {
         d('A', 'vpn', '10.50.1.5', 60), d('A', 'runner-1', '10.51.1.11', 60), d('A', 'runner-2', '10.51.1.12', 60), d('A', 'backup', '10.51.1.20', 60),
         d('A', 'isu', '10.30.2.10', 60), d('A', 's4', '10.31.10.10', 60),
       ] },
-    { id: 'zone-003', name: 'regiocom.enneo.ai', ...scope('proj-enneo-regiocom'), kind: 'public', networkId: null, dnssec: true, defaultTtl: 3600, serial: 2026110301, nameservers: NS, status: 'active', createdAt: ago(236 * DAY), tags: enneoTags('prod'), description: 'Delegated from enneo.ai',
-      dsRecord: 'regiocom.enneo.ai. 3600 IN DS 50211 13 2 3B9E1C77D0A4F2E8B6C5D4A3F2E1D0C9B8A7F6E5D4C3B2A1F0E9D8C7B6A5F4E3',
-      records: [
-        d('A', '@', '203.0.113.40', 300, undefined, { type: 'lb', id: 'lb-004' }), d('CNAME', 'api', 'regiocom.enneo.ai.', 300),
-        d('CAA', '@', '0 issue "letsencrypt.org"', 3600), d('TXT', '@', 'v=spf1 include:regiocom-energie.de -all', 3600),
-      ] },
     { id: 'zone-004', name: 'compass.internal', ...scope('proj-compass'), kind: 'private', networkId: 'net-001', dnssec: false, defaultTtl: 300, serial: 2026110501, nameservers: ['10.10.0.2'], status: 'active', createdAt: ago(670 * DAY), tags: ptags('proj-compass', 'prod'), description: 'Service discovery inside vpc-compass',
       records: [
         d('A', 'db', '10.10.2.50', 60, undefined, { type: 'db', id: 'db-001' }), d('A', 'cache', '10.10.2.60', 60, undefined, { type: 'db', id: 'db-002' }),
@@ -224,6 +262,7 @@ export function seedNetwork() {
       ] },
     { id: 'zone-005', name: 'regiocom-energie.com', ...scope('proj-website'), kind: 'public', networkId: null, dnssec: false, defaultTtl: 3600, serial: 2026110701, nameservers: NS, status: 'pending-delegation', createdAt: ago(1 * DAY), tags: ptags('proj-website', 'prod'), description: 'Defensive registration — redirects to regiocom-energie.de',
       records: [d('A', '@', '198.51.100.10', 300), d('CNAME', 'www', 'regiocom-energie.com.', 300)] },
+    ...enneoZones(),
   ];
 
   return { networks, ipPools, ips, firewalls, dnsZones };

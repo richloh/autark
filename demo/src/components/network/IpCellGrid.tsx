@@ -63,7 +63,7 @@ export function IpCellGrid({ cells, projects, selected, onSelect, className, hig
         <div className="pointer-events-none absolute z-20 w-max max-w-64 -translate-x-1/2 -translate-y-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-xs shadow-pop" style={{ left: Math.max(90, Math.min(hover.x, (wrap.current?.clientWidth ?? 400) - 90)), top: hover.y - 6 }}>
           <div className="font-mono font-medium text-fg">{hover.cell.address}</div>
           <div className="text-muted">{STATE_LABEL[hover.cell.state]}{hover.cell.state === 'reserved' && hover.cell.name ? ` · ${hover.cell.name}` : ''}</div>
-          {hover.cell.owner && <div className="text-fg-2">→ {hover.cell.owner.type.toUpperCase()} {hover.cell.owner.name ?? hover.cell.owner.id}</div>}
+          {hover.cell.owner && <div className="text-fg-2">→ {hover.cell.owner.type.toUpperCase()} {hover.cell.owner.name ?? (hover.cell.owner.type === 'k8s' && hover.cell.name ? hover.cell.name : hover.cell.owner.id)}</div>}
           {hover.cell.projectId && <div className="text-faint">{projects.get(hover.cell.projectId)?.name ?? hover.cell.projectId}</div>}
           {hover.cell.reverseDns && <div className="font-mono text-faint">PTR {hover.cell.reverseDns}</div>}
           {hover.cell.state === 'free' && onSelect && <div className="text-brand-500">Click to allocate</div>}

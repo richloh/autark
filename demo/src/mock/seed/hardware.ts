@@ -1,5 +1,5 @@
 import type { BareMetalHost, CloudProvider, HostAccess, HostRole } from '@/types';
-import { ago, tags, DAY, HOUR, MIN, E } from './util';
+import { ago, tags, DAY, HOUR, MIN } from './util';
 
 const DISK_MODEL: Record<string, string> = { nvme: 'Samsung PM9A3', ssd: 'Micron 5400 PRO', hdd: 'Seagate Exos X18' };
 const FW: Record<string, { bios: string; bmc: string; bmcOld: string }> = {
@@ -18,7 +18,6 @@ interface HostSpec {
 
 const ALL: HostAccess = { mode: 'all', accountIds: [], projectIds: [] };
 const SAP_ONLY: HostAccess = { mode: 'restricted', accountIds: [], projectIds: ['proj-isu', 'proj-s4'] };
-const ENNEO_ONLY: HostAccess = { mode: 'restricted', accountIds: [E], projectIds: [] };
 
 /* RZ Magdeburg (dc1) — own datacenter, rows A/B. RZ Frankfurt (dc2) — colocation cage near DE-CIX, own hardware. */
 const HOSTS: HostSpec[] = [
@@ -41,13 +40,13 @@ const HOSTS: HostSpec[] = [
   { id: 'bm-007', name: 'mdg-sap-02', loc: 'dc1', rack: 'A03', u: 24, sizeU: 2, vendor: 'HPE', model: 'ProLiant DL380 Gen11', cpu: '2× Intel Xeon Platinum 8468', sockets: 2, cores: 96, ramGB: 1536,
     disks: [['nvme', 7680, 4], ['ssd', 960, 2]], status: 'ready', roles: ['compute'], access: SAP_ONLY, cpuOvercommit: 1,
     extra: { tags: tags({ certification: 'SAP HANA TDI' }), notes: 'SAP HANA TDI certified. No CPU overcommit. Reserved for SAP IS/U and SAP S4.' } },
-  // dc1 · GPU hosts — Enneo AI platform (sovereign LLM inference for Regiocom customer service)
+  // dc1 · GPU hosts — shared GPU pool: runs the Autark copilot model, remaining GPUs available to every project as GPU VMs
   { id: 'bm-008', name: 'mdg-gpu-01', loc: 'dc1', rack: 'A04', u: 20, sizeU: 4, vendor: 'Supermicro', model: 'SYS-421GE-TNRT', cpu: '2× Intel Xeon Gold 6448Y', sockets: 2, cores: 64, ramGB: 1024,
-    disks: [['nvme', 7680, 2], ['nvme', 3840, 2]], gpus: [{ model: 'L40S', count: 4 }], status: 'ready', roles: ['compute', 'k8s-worker'], access: ENNEO_ONLY, cpuOvercommit: 1,
-    extra: { tags: tags({ owner: 'enneo' }), notes: 'Purchased by Enneo, hosted in RZ Magdeburg. Serves vLLM inference for enneo-prod.' } },
+    disks: [['nvme', 7680, 2], ['nvme', 3840, 2]], gpus: [{ model: 'L40S', count: 4 }], status: 'ready', roles: ['compute'], access: ALL, cpuOvercommit: 1,
+    extra: { tags: tags({ pool: 'gpu' }), notes: 'Serves the Autark copilot model (Llama 3.3 70B via vLLM, 2× L40S). The remaining GPUs are open to all projects as GPU VMs (G-series presets).' } },
   { id: 'bm-009', name: 'mdg-gpu-02', loc: 'dc1', rack: 'A04', u: 14, sizeU: 4, vendor: 'Supermicro', model: 'SYS-4029GP-TRT', cpu: '2× Intel Xeon Gold 6248R', sockets: 2, cores: 48, ramGB: 512,
-    disks: [['nvme', 3840, 2], ['ssd', 7680]], gpus: [{ model: 'L40S', count: 4 }], status: 'ready', roles: ['compute', 'k8s-worker'], access: ENNEO_ONLY, cpuOvercommit: 1,
-    extra: { tags: tags({ owner: 'enneo' }) } },
+    disks: [['nvme', 3840, 2], ['ssd', 7680]], gpus: [{ model: 'L40S', count: 4 }], status: 'ready', roles: ['compute'], access: ALL, cpuOvercommit: 1,
+    extra: { tags: tags({ pool: 'gpu' }), notes: 'Shared GPU capacity for all projects (GPU VMs). Currently idle.' } },
   // dc1 · Ceph storage nodes (block volumes + object storage)
   { id: 'bm-010', name: 'mdg-stor-01', loc: 'dc1', rack: 'B01', u: 10, sizeU: 4, vendor: 'Supermicro', model: 'SSG-640P-E1CR36H', cpu: 'Intel Xeon Silver 4314', sockets: 1, cores: 16, ramGB: 256,
     disks: [['hdd', 18000, 12], ['nvme', 3840, 2]], status: 'ready', roles: ['storage'], hypervisor: 'none', extra: { tags: tags({ ceph: 'osd' }) } },

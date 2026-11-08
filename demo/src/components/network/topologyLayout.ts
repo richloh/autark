@@ -42,7 +42,7 @@ export function layoutTopology(d: TopologyData, o: LayoutOpts): Layout {
 
   const fwByRef = new Map<string, Firewall[]>();
   for (const f of d.firewalls) for (const r of f.attachedTo) { const k = `${r.type}:${r.id}`; fwByRef.set(k, [...(fwByRef.get(k) ?? []), f]) }
-  const ipsOf = (type: 'vm' | 'lb', id: string) => (o.kinds.has('ip') ? d.ips.filter((i) => i.assignedTo?.type === type && i.assignedTo.id === id) : []);
+  const ipsOf = (type: 'vm' | 'lb' | 'k8s', id: string) => (o.kinds.has('ip') ? d.ips.filter((i) => i.assignedTo?.type === type && i.assignedTo.id === id) : []);
 
   const nets = d.networks.filter(inProject);
   const locIds = [...new Set(nets.map((n) => n.locationId))];
@@ -54,7 +54,7 @@ export function layoutTopology(d: TopologyData, o: LayoutOpts): Layout {
 
   const placeIps = (owner: TNode, ips: IpAddress[], top: number) => {
     ips.forEach((ip, i) => {
-      const n = add({ id: nid('ip', ip.id), kind: 'ip', label: ip.address, sub: ip.reverseDns ?? (ip.version === 6 ? 'IPv6' : 'IPv4'), x: COL.ip, y: top + i * ROW + ROW / 2, w: W.ip, h: 26,
+      const n = add({ id: nid('ip', ip.id), kind: 'ip', label: ip.address, sub: ip.reverseDns ?? ip.name ?? (ip.version === 6 ? 'IPv6' : 'IPv4'), x: COL.ip, y: top + i * ROW + ROW / 2, w: W.ip, h: 26,
         color: KINDS.ip.color, link: KINDS.ip.link?.(ip.id), projectId: ip.projectId, ref: ip, search: `${ip.address} ${ip.reverseDns ?? ''}`, parent: owner.id });
       ipNodes.push(n);
       edge({ id: `${owner.id}>${n.id}`, from: owner.id, to: n.id, kind: 'tree' });
@@ -104,7 +104,7 @@ export function layoutTopology(d: TopologyData, o: LayoutOpts): Layout {
           edge({ id: `${netNode.id}>${sn.id}`, from: netNode.id, to: sn.id, kind: 'tree' });
           if (!res.length) y += ROW;
           for (const { kind, row } of res) {
-            const ips = kind === 'vm' ? ipsOf('vm', row.id) : [];
+            const ips = kind === 'db' ? [] : ipsOf(kind, row.id);
             const rows = Math.max(1, ips.length);
             const sub = kind === 'vm' ? row.privateIp : kind === 'db' ? `${row.engine} ${row.version}${row.ha ? ' · HA' : ''}` : `k8s ${row.version} · ${row.nodePools?.reduce((a: number, p: any) => a + p.count, 0) ?? 0} nodes`;
             const n = add({ id: nid(kind, row.id), kind, label: row.name, sub, x: COL.res, y: y + (rows * ROW) / 2, w: W.res, h: 34, status: row.status, color: KINDS[kind].color,

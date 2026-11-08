@@ -46,7 +46,7 @@ export default function DnsDetail() {
 
   const ipSuggestions = useMemo(() => ips.filter((i) => !zone || i.projectId === zone.projectId).map((i) => ({
     address: i.address,
-    label: i.assignedTo ? (i.assignedTo.type === 'vm' ? vms.get(i.assignedTo.id)?.name : lbs.get(i.assignedTo.id)?.name) ?? i.assignedTo.id : 'unassigned',
+    label: i.assignedTo ? (i.assignedTo.type === 'vm' ? vms.get(i.assignedTo.id)?.name : i.assignedTo.type === 'lb' ? lbs.get(i.assignedTo.id)?.name : i.name) ?? i.assignedTo.id : 'unassigned',
   })), [ips, vms, lbs, zone]);
 
   if (isLoading) return <Page><Skeleton className="mb-4 h-10 w-72" /><Skeleton className="h-64" /></Page>;

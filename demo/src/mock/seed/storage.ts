@@ -4,7 +4,6 @@ import { ago, tags, ptags, scope, DAY, HOUR, MIN } from './util';
 const GB = 1024 ** 3;
 
 export function seedStorage() {
-  const enneoTags = (env: string) => tags({ env, team: 'enneo' });
   const buckets: Bucket[] = [
     { id: 'bkt-001', name: 'compass-invoices', ...scope('proj-compass'), locationId: 'dc1', storageClass: 'STANDARD', versioning: true, objectLock: true, objectLockRetentionDays: 3650, objectLockMode: 'compliance', encryption: 'SSE-KMS', access: 'private', status: 'active',
       bytesUsed: 2150 * GB, objectCount: 18_420_311, requestsLast30d: 9_800_000, egressGBLast30d: 340,
@@ -25,14 +24,6 @@ export function seedStorage() {
       cors: [], endpoint: 'https://s3.dc2.autark.cloud/backups', quotaGB: null, createdAt: ago(560 * DAY), tags: ptags('proj-tools', 'prod'), description: 'Offsite backups (restic) — immutable for 30 days' },
     { id: 'bkt-005', name: 'terraform-state', ...scope('proj-tools'), locationId: 'dc1', storageClass: 'STANDARD', versioning: true, objectLock: true, objectLockRetentionDays: 7, objectLockMode: 'governance', encryption: 'SSE-KMS', access: 'private', status: 'active',
       bytesUsed: 0.3 * GB, objectCount: 212, requestsLast30d: 220_000, egressGBLast30d: 1, lifecycleRules: [], cors: [], endpoint: 'https://s3.dc1.autark.cloud/terraform-state', quotaGB: 10, createdAt: ago(500 * DAY), tags: ptags('proj-tools', 'prod') },
-    { id: 'bkt-006', name: 'enneo-attachments', ...scope('proj-enneo-regiocom'), locationId: 'dc1', storageClass: 'STANDARD', versioning: true, objectLock: false, encryption: 'SSE-KMS', access: 'private', status: 'active',
-      bytesUsed: 940 * GB, objectCount: 3_480_102, requestsLast30d: 14_200_000, egressGBLast30d: 95,
-      lifecycleRules: [{ id: 'lc-7', prefix: 'tmp/', action: 'expire', days: 1, enabled: true }, { id: 'lc-8', prefix: 'mails/', action: 'expire', days: 1095, enabled: true }],
-      cors: [{ id: 'cors-2', origins: ['https://regiocom.enneo.ai'], methods: ['GET', 'PUT'], maxAgeSec: 600 }],
-      endpoint: 'https://s3.dc1.autark.cloud/enneo-attachments', quotaGB: 2000, createdAt: ago(236 * DAY), tags: enneoTags('prod'), description: 'Customer e-mail attachments (stays in RZ Magdeburg)' },
-    { id: 'bkt-007', name: 'enneo-models', ...scope('proj-enneo-intern'), locationId: 'dc1', storageClass: 'STANDARD', versioning: true, objectLock: false, encryption: 'SSE-KMS', access: 'private', status: 'active',
-      bytesUsed: 610 * GB, objectCount: 1_204, requestsLast30d: 48_000, egressGBLast30d: 820, lifecycleRules: [{ id: 'lc-9', prefix: 'checkpoints/', action: 'transition', days: 60, toClass: 'INFREQUENT', enabled: true }],
-      cors: [], endpoint: 'https://s3.dc1.autark.cloud/enneo-models', quotaGB: 2000, createdAt: ago(200 * DAY), tags: enneoTags('dev') },
     { id: 'bkt-008', name: 'isu-hana-backups', ...scope('proj-isu'), locationId: 'dc2', storageClass: 'INFREQUENT', versioning: true, objectLock: true, objectLockRetentionDays: 35, objectLockMode: 'compliance', encryption: 'SSE-KMS', access: 'private', status: 'active',
       bytesUsed: 14_200 * GB, objectCount: 6_118, requestsLast30d: 120_000, egressGBLast30d: 2,
       lifecycleRules: [{ id: 'lc-10', prefix: 'log/', action: 'expire', days: 35, enabled: true }, { id: 'lc-11', prefix: 'data/', action: 'transition', days: 14, toClass: 'ARCHIVE', enabled: true }],
@@ -53,7 +44,7 @@ export function seedStorage() {
     retainUntil: LOCK_DAYS[bucketId] ? new Date(Date.now() - minutesAgo * MIN + LOCK_DAYS[bucketId] * DAY).toISOString() : null,
     etag: `"${(n * 2654435761 >>> 0).toString(16).padStart(8, '0')}${(n * 40503 >>> 0).toString(16)}"`, lastModified: ago(minutesAgo * MIN), createdAt: ago(minutesAgo * MIN), content, tags: [],
   });
-  const C = 'proj-compass', W = 'proj-website', T = 'proj-tools', EP = 'proj-enneo-regiocom', EI = 'proj-enneo-intern', I = 'proj-isu', O = 'proj-orchestrator';
+  const C = 'proj-compass', W = 'proj-website', T = 'proj-tools', I = 'proj-isu', O = 'proj-orchestrator';
 
   const bucketObjects: BucketObject[] = [
     o('bkt-001', C, 'invoices/2026/11/RE-2026-11-0048213.pdf', 84_221, 'application/pdf', 40),
@@ -76,13 +67,6 @@ export function seedStorage() {
     o('bkt-004', T, 'restic/config', 155, 'application/octet-stream', 500_000),
     o('bkt-005', T, 'env/prod/terraform.tfstate', 612_331, 'application/json', 2 * 60, '{\n  "version": 4,\n  "terraform_version": "1.9.5",\n  "serial": 2207,\n  "lineage": "6c1f0f6e-..."\n}\n'),
     o('bkt-005', T, 'env/staging/terraform.tfstate', 188_002, 'application/json', 26 * 60),
-    o('bkt-006', EP, 'mails/2026/11/08/8f2c1a0e/zaehlerfoto.jpg', 2_182_400, 'image/jpeg', 12),
-    o('bkt-006', EP, 'mails/2026/11/08/41be9d77/kuendigung.pdf', 176_100, 'application/pdf', 35),
-    o('bkt-006', EP, 'mails/2026/11/08/0d5a33c2/sepa-mandat.pdf', 201_950, 'application/pdf', 64),
-    o('bkt-007', EI, 'base/Llama-3.3-70B-Instruct-AWQ/config.json', 1_024, 'application/json', 30 * 1440, '{\n  "architectures": ["LlamaForCausalLM"],\n  "hidden_size": 8192,\n  "num_hidden_layers": 80,\n  "quantization_config": { "quant_method": "awq", "bits": 4 }\n}\n'),
-    o('bkt-007', EI, 'base/Llama-3.3-70B-Instruct-AWQ/model.safetensors', 39_728_447_488, 'application/octet-stream', 30 * 1440),
-    o('bkt-007', EI, 'checkpoints/regiocom-intent-v7/adapter_model.safetensors', 335_544_320, 'application/octet-stream', 4 * 1440),
-    o('bkt-007', EI, 'embeddings/multilingual-e5-large/model.onnx', 2_240_000_000, 'application/octet-stream', 60 * 1440),
     o('bkt-008', I, 'data/IP1/2026-11-08_0100/databackup_0_1', 1_932_735_283_200, 'application/octet-stream', 7 * 60),
     o('bkt-008', I, 'data/IP1/2026-11-07_0100/databackup_0_1', 1_928_100_000_000, 'application/octet-stream', 31 * 60),
     o('bkt-008', I, 'log/IP1/2026-11-08/log_backup_1_0_88213440_88229120', 2_147_483_648, 'application/octet-stream', 20),
@@ -96,8 +80,6 @@ export function seedStorage() {
     { id: 'ak-002', name: 'website-deploy', ...scope(W), accessKeyId: 'AUTK91BC22D0FF1M', secretMasked: '••••••••••••9qLw', bucketIds: ['bkt-003'], permission: 'readwrite', createdAt: ago(400 * DAY), lastUsed: ago(2 * DAY), status: 'active', tags: [] },
     { id: 'ak-003', name: 'restic-backup', ...scope(T), accessKeyId: 'AUTK0C77E1A9B3KZ', secretMasked: '••••••••••••mN3e', bucketIds: ['bkt-004'], permission: 'write', createdAt: ago(540 * DAY), lastUsed: ago(9 * HOUR), status: 'active', tags: [] },
     { id: 'ak-004', name: 'hana-backint', ...scope(I), accessKeyId: 'AUTKD3A1F00B2C9R', secretMasked: '••••••••••••Pp7a', bucketIds: ['bkt-008'], permission: 'readwrite', createdAt: ago(670 * DAY), lastUsed: ago(20 * MIN), status: 'active', tags: [] },
-    { id: 'ak-005', name: 'enneo-attachments-rw', ...scope(EP), accessKeyId: 'AUTK5E9C0A1B7D2N', secretMasked: '••••••••••••Qe4r', bucketIds: ['bkt-006'], permission: 'readwrite', createdAt: ago(230 * DAY), lastUsed: ago(1 * MIN), status: 'active', tags: [] },
-    { id: 'ak-006', name: 'enneo-models-ro', ...scope(EI), accessKeyId: 'AUTK2B8D4F6A0C1E', secretMasked: '••••••••••••Lm8t', bucketIds: ['bkt-007'], permission: 'read', createdAt: ago(190 * DAY), lastUsed: ago(25 * MIN), status: 'active', tags: [] },
     { id: 'ak-007', name: 'terraform-backend', ...scope(T), accessKeyId: 'AUTK7E7E9A0C1B2T', secretMasked: '••••••••••••tF9s', bucketIds: ['bkt-005'], permission: 'readwrite', createdAt: ago(490 * DAY), lastUsed: ago(2 * HOUR), status: 'active', tags: [] },
     { id: 'ak-008', name: 'edifact-archiver', ...scope(O), accessKeyId: 'AUTK3C1A9E7F5B0D', secretMasked: '••••••••••••Vh6w', bucketIds: ['bkt-009'], permission: 'write', createdAt: ago(500 * DAY), lastUsed: ago(3 * MIN), status: 'active', tags: [] },
     { id: 'ak-009', name: 'old-sap-consultant', ...scope(I), accessKeyId: 'AUTK11A0E9C4D2VW', secretMasked: '••••••••••••a0Zz', bucketIds: ['bkt-008'], permission: 'read', createdAt: ago(380 * DAY), lastUsed: ago(48 * DAY), status: 'revoked', tags: [] },

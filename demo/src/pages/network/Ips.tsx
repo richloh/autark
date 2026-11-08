@@ -26,7 +26,7 @@ import { IpCellGrid, CellLegend } from '@/components/network/IpCellGrid';
 import { Advanced, Pro } from '@/components/ui/Pro';
 import { usePro } from '@/store/ui';
 import { useDefaultProject } from '@/components/network/useDefaultProject';
-import type { IpAddress, IpPool, IpPoolMap, IpCell, VM, LoadBalancer, Project, Location } from '@/types';
+import type { IpAddress, IpPool, IpPoolMap, IpCell, VM, LoadBalancer, K8sCluster, Project, Location } from '@/types';
 
 type Filter = 'all' | 'assigned' | 'idle' | 'v6';
 
@@ -37,6 +37,7 @@ export default function Ips() {
   const { items: pools } = useList<IpPool>('ipPools');
   const { map: vms, items: vmList } = useLookup<VM>('vms');
   const { map: lbs, items: lbList } = useLookup<LoadBalancer>('loadBalancers');
+  const { map: clusters } = useLookup<K8sCluster>('k8sClusters');
   const { map: projects } = useLookup<Project>('projects');
   const { map: locations } = useLookup<Location>('locations');
   const [poolId, setPoolId] = useState<string>('');
@@ -64,7 +65,19 @@ export default function Ips() {
   };
   const unassign = (ip: IpAddress) => action.mutate({ id: ip.id, a: 'unassign' }, { onSuccess: () => toast.success(`${ip.address} unassigned`) });
 
-  const ownerName = (ip: IpAddress) => ip.assignedTo ? (ip.assignedTo.type === 'vm' ? vms.get(ip.assignedTo.id)?.name : lbs.get(ip.assignedTo.id)?.name) : undefined;
+  const ownerName = (ip: IpAddress) => {
+    const a = ip.assignedTo;
+    if (!a) return undefined;
+    if (a.type === 'k8s') return clusters.get(a.id)?.name;
+    return a.type === 'vm' ? vms.get(a.id)?.name : lbs.get(a.id)?.name;
+  };
+  /** Kubernetes node IPs: link the cluster and name the node ("p6 · node 2"). */
+  const owner = (ip: IpAddress) => !ip.assignedTo ? null : (
+    <span className="inline-flex min-w-0 items-center gap-1">
+      <ResourceLink type={ip.assignedTo.type} id={ip.assignedTo.id} name={ownerName(ip)} />
+      {ip.assignedTo.type === 'k8s' && ip.name && <span className="truncate text-[11px] text-muted">· {ip.name.replace(/^.*?-?node-?/, 'node ')}</span>}
+    </span>
+  );
   const idle = ips.filter((i) => !i.assignedTo);
   const counts = { all: ips.length, assigned: ips.length - idle.length, idle: idle.length, v6: ips.filter((i) => i.version === 6).length };
   const rows = ips.filter((i) => filter === 'all' || (filter === 'assigned' ? i.assignedTo : filter === 'idle' ? !i.assignedTo : i.version === 6));
@@ -82,7 +95,7 @@ export default function Ips() {
     },
     {
       id: 'assigned', header: 'Assigned to', sort: (i) => ownerName(i) ?? 'zzz',
-      cell: (i) => i.assignedTo ? <ResourceLink type={i.assignedTo.type} id={i.assignedTo.id} name={ownerName(i)} />
+      cell: (i) => i.assignedTo ? owner(i)
         : <button type="button" className="text-xs font-medium text-brand-500 hover:underline" onClick={(e) => { e.stopPropagation(); setAssignFor(i) }}>Assign…</button>,
     },
     { id: 'location', header: 'Location', hideBelow: 'md', sort: (i) => poolOf(i)?.locationId ?? '', cell: (i) => { const l = locations.get(poolOf(i)?.locationId ?? ''); return <span className="flex items-center gap-1.5 text-fg-2">{l?.kind === 'cloud' ? <Cloud className="size-3.5 text-sky-500" /> : <Building2 className="size-3.5 text-emerald-500" />}{l?.name ?? poolOf(i)?.locationId ?? '—'}</span> } },
@@ -105,7 +118,7 @@ export default function Ips() {
     { id: 'version', header: 'Type', hideBelow: 'md', sort: (i) => i.version, cell: (i) => <Badge tone={i.version === 6 ? 'violet' : 'info'}>IPv{i.version}</Badge> },
     {
       id: 'assigned', header: 'Assigned to', sort: (i) => ownerName(i) ?? 'zzz',
-      cell: (i) => i.assignedTo ? <ResourceLink type={i.assignedTo.type} id={i.assignedTo.id} name={ownerName(i)} /> : <Badge tone="warning">idle · {money(PRICING.ip.v4PerMonth * (i.version === 4 ? 1 : 0))}/mo</Badge>,
+      cell: (i) => i.assignedTo ? owner(i) : <Badge tone="warning">idle · {money(PRICING.ip.v4PerMonth * (i.version === 4 ? 1 : 0))}/mo</Badge>,
     },
     { id: 'rdns', header: 'Reverse DNS', hideBelow: 'lg', cell: (i) => i.reverseDns ? <Mono className="text-fg-2">{i.reverseDns}</Mono> : <button type="button" className="text-xs text-faint hover:text-brand-500" onClick={(e) => { e.stopPropagation(); setRdnsFor(i) }}>set PTR…</button> },
     { id: 'pool', header: 'Pool', hideBelow: 'xl', sort: (i) => i.poolId, cell: (i) => { const p = pools.find((x) => x.id === i.poolId); return <span className="text-fg-2">{p?.name ?? i.poolId}</span> } },
@@ -192,7 +205,7 @@ export default function Ips() {
                 {selIp ? (
                   <>
                     <dl className="space-y-1.5 text-[13px]">
-                      <div className="flex justify-between gap-2"><dt className="text-muted">Assigned to</dt><dd>{selIp.assignedTo ? <ResourceLink type={selIp.assignedTo.type} id={selIp.assignedTo.id} name={ownerName(selIp)} /> : <span className="text-amber-600">idle</span>}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-muted">Assigned to</dt><dd>{selIp.assignedTo ? owner(selIp) : <span className="text-amber-600">idle</span>}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-muted">Project</dt><dd className="text-fg-2">{projects.get(selIp.projectId)?.name}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-muted">PTR</dt><dd className="truncate font-mono text-xs text-fg-2">{selIp.reverseDns ?? '—'}</dd></div>
                     </dl>
